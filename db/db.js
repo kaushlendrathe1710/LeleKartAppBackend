@@ -1,8 +1,9 @@
+// db.js
 const { drizzle } = require("drizzle-orm/postgres-js");
 const postgres = require("postgres");
+const dotenv = require("dotenv");
 
 // Load environment variables
-const dotenv = require("dotenv");
 dotenv.config();
 
 const schema = require("./schema");
