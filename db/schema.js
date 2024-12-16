@@ -1,4 +1,6 @@
+
 const { relations, sql } = require("drizzle-orm");
+
 const {
   bigint,
   boolean,
@@ -54,6 +56,8 @@ const users = createTable("user", {
   gender: varchar("gender").default("Male"),
   isApproved: varchar("isApproved").default("pending").notNull(),
 });
+
+//Products table definition
 const products = createTable("products", {
   id: serial("id").primaryKey(),
   vendorEmail: varchar("vendorEmail")
@@ -92,6 +96,7 @@ const products = createTable("products", {
   createdAt: timestamp("createdAt").defaultNow(),
   updatedAt: timestamp("updatedAt").defaultNow(),
 });
+
 module.exports = {
   posts,
   users,
