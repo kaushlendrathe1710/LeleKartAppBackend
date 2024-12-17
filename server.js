@@ -1,47 +1,38 @@
-const express = require("express");
-const { db } = require("./db/db");
-const schema = require("./db/schema");
+
+const { db } = require("./config/db/db");
+const schema = require("./config/db/schema");
 const { sql, eq } = require("drizzle-orm");
-const { carts, cartProducts } = require("./db/schema");
+const express = require("express");
+const dotenv = require("dotenv");
+const passport = require("passport");
+require('./config/passport')
+const authRoutes = require('./routes/authRoutes')
+
+dotenv.config();
+
 const app = express();
 
-// Middleware to parse JSON
+// Middleware
 app.use(express.json());
+app.use(passport.initialize());
+
 // Middleware to attach the database client to the request
 app.use((req, res, next) => {
   req.db = db;
   next();
 });
 
-app.get("/getCart", async (req, res) => {
-  const myMail = "manoj2022019@gmail.com";
-  try {
-    const cart = await db.query?.carts?.findFirst({
-      where: eq(carts.userEmail, myMail),
-      with: {
-        cartProducts: true,
-      },
-    });
+// app.get("/", async (req, res) => {
+//   try {
+//     console.log('api is running')
+//     res.status(200).json("api is running");
+//   } catch (error) {
+//     console.error("Error fetching cart:", error);
+//     res.status(500).json({ message: "Internal Server Error", error });
+//   }
+// });
 
-    console.log("Fetched Cart:", cart);
-    res.status(200).json(cart);
-  } catch (error) {
-    console.error("Error fetching cart:", error);
-    res.status(500).json({ message: "Internal Server Error", error });
-  }
-});
-
-app.get("/products", async (req, res) => {
-  try {
-    const result = await await db.query.products?.findMany();
-
-    console.log(result);
-    res.status(200).json(result);
-  } catch (error) {
-    console.error("Error fetching data:", error);
-    res.status(500).json({ message: "Internal server error" });
-  }
-});
+app.use("/api/auth", authRoutes);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () =>
