@@ -261,4 +261,17 @@ const verifyUserByOtp = async (req, res) => {
   }
 };
 
-module.exports = { register, login, verifyUserByOtp };
+const forgotPassword = async (req, res) => {};
+
+const verifyOtpForResetPassowrd = async (req, res) => {};
+
+const resetPassword = async (req, res) => {};
+
+module.exports = {
+  register,
+  login,
+  verifyUserByOtp,
+  forgotPassword,
+  verifyOtpForResetPassowrd,
+  resetPassword,
+};
