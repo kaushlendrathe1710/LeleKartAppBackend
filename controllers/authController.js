@@ -1,7 +1,7 @@
 // backend/src/controllers/auth.js
 const { db } = require("../config/db/db");
-const { users, userVerifications } = require("../config/db/schema");
-const { eq, sql } = require("drizzle-orm");
+const { users, userVerifications, accounts } = require("../config/db/schema");
+const { eq } = require("drizzle-orm");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { validationResult } = require("express-validator");
@@ -144,9 +144,9 @@ const register = async (req, res) => {
   }
 };
 
-// Login User
 const login = async (req, res) => {
   console.log("hit this");
+
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({ errors: errors.array() });
@@ -161,13 +161,42 @@ const login = async (req, res) => {
     });
 
     if (!user) {
-      return res.status(400).json({ message: "Invalid credentials" });
+      return res.status(404).json({
+        message: "User with this email doesn't exist, Create a new account",
+      });
     }
 
     // Check password
-    const isMatch = await bcrypt.compare(password, user.password || "");
-    if (!isMatch) {
-      return res.status(400).json({ message: "Invalid credentials" });
+    // const isMatch = await bcrypt.compare(password, user.password || "");
+    // if (!isMatch) {
+    //   return res.status(400).json({ message: "Incorrect password" });
+    // }
+
+    if (user.password) {
+      // Check password if provided
+      const isMatch = await bcrypt.compare(password, user.password || "");
+      if (!isMatch) {
+        return res.status(400).json({
+          message: "Incorrect password, Please fill correct password",
+        });
+      }
+    } else {
+      // If password is null, check for social login accounts associated with user.id
+      const socialAccount = await db.query.accounts.findFirst({
+        where: eq(accounts.userId, user.id),
+      });
+
+      if (socialAccount) {
+        return res.status(200).json({
+          message: "User authenticated through social login.",
+          type: socialAccount.type,
+          provider: socialAccount.provider,
+        });
+      }
+
+      return res
+        .status(400)
+        .json({ message: "No password or social account found" });
     }
 
     // Generate JWT token
@@ -175,7 +204,7 @@ const login = async (req, res) => {
       expiresIn: "1h",
     });
 
-    res.json({
+    res.status(200).json({
       token,
       user: {
         id: user.id,
@@ -185,8 +214,8 @@ const login = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Server error" });
+    console.error("Login Error:", error.message);
+    res.status(500).json({ message: "An unexpected server error occurred" });
   }
 };
 
