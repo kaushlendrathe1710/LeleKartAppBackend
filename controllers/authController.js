@@ -9,8 +9,6 @@ const crypto = require("crypto");
 const { sendVerificationEmail } = require("../utils/nodemailer");
 
 const register = async (req, res) => {
-  console.log("Request body:", req.body);
-
   try {
     const { email, password, role, name, phone } = req.body;
 
@@ -20,14 +18,11 @@ const register = async (req, res) => {
         .json({ message: "Email and password are required" });
     }
 
-    console.log("Fetching existing user...");
     const existingUser = await req.db
       .select()
       .from(users)
       .where(eq(users.email, email))
       .then((rows) => rows[0]);
-
-    console.log("Existing user:", existingUser);
 
     if (existingUser) {
       if (existingUser.role !== role) {
@@ -41,20 +36,16 @@ const register = async (req, res) => {
       const verificationCode = crypto.randomInt(100000, 999999).toString();
       const userName = `${role || "user"}${crypto.randomInt(100000, 999999)}`;
 
-      console.log("updating user");
       await db
         .update(users)
         .set({ password: hashedPassword })
         .where(eq(users.email, email));
 
-      console.log("Fetching created user...");
       const createdUser = await req.db
         .select()
         .from(users)
         .where(eq(users.email, email))
         .then((rows) => rows[0]);
-
-      console.log("updating verification code...");
 
       // Check if a record with the given email exists
       const existingVerification = await db
@@ -80,8 +71,6 @@ const register = async (req, res) => {
           .where(eq(userVerifications.email, email))
           .limit(1)
           .then((rows) => rows[0]);
-
-        console.log("Updated verification record:", updatedVerification);
       } else {
         // If the record does not exist, insert a new one
         data = await db
@@ -95,8 +84,6 @@ const register = async (req, res) => {
           .where(eq(userVerifications.email, email))
           .limit(1)
           .then((rows) => rows[0]);
-
-        console.log("Inserted new verification record:", insertedVerification);
       }
 
       //   console.log("Sending verification email...", updatedVerification);
@@ -145,8 +132,6 @@ const register = async (req, res) => {
 };
 
 const login = async (req, res) => {
-  console.log("hit this");
-
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({ errors: errors.array() });
@@ -165,12 +150,6 @@ const login = async (req, res) => {
         message: "User with this email doesn't exist, Create a new account",
       });
     }
-
-    // Check password
-    // const isMatch = await bcrypt.compare(password, user.password || "");
-    // if (!isMatch) {
-    //   return res.status(400).json({ message: "Incorrect password" });
-    // }
 
     if (user.password) {
       // Check password if provided
@@ -222,14 +201,6 @@ const login = async (req, res) => {
 const verifyUserByOtp = async (req, res) => {
   try {
     const { email, verificationCode } = req.body;
-
-    console.log(
-      "Received email:",
-      email,
-      "Verification code:",
-      verificationCode
-    );
-
     // Helper function to find user verification record
     const findUserVerificationRecord = async (email) => {
       return await db
@@ -259,8 +230,6 @@ const verifyUserByOtp = async (req, res) => {
 
     // ✅ **Find the user's verification record**
     const userVerification = await findUserVerificationRecord(email);
-
-    console.log("User verification record:", userVerification);
 
     if (!userVerification) {
       return res.status(400).json({ message: "Register First" });
