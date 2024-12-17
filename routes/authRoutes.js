@@ -2,14 +2,14 @@
 const { body } = require("express-validator");
 const passport = require("passport");
 const jwt = require("jsonwebtoken");
-const { register, login } = require("../controllers/authController");
+const { register, login, verifyUserByOtp } = require("../controllers/authController");
 const { authMiddleware } = require("../middleware/auth");
 const { db, users } = require("../config/db/db");
 const { eq } = require("drizzle-orm");
 const express = require("express");
 const router = express.Router();
 
-// Local Authentication Routes
+// register route
 router.post(
   "/register",
   [
@@ -20,6 +20,10 @@ router.post(
   register
 );
 
+//verify route
+router.post("/verifyuser", verifyUserByOtp);
+
+// login route
 router.post(
   "/login",
   [body("email").isEmail().normalizeEmail(), body("password").exists()],

@@ -687,4 +687,6 @@ module.exports = {
   cartProducts,
   cartsRelations,
   cartProductsRelations,
+  usersRelations,
+  userVerifications,
 };
