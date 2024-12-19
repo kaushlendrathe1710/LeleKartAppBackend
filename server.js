@@ -1,12 +1,12 @@
-
 const { db } = require("./config/db/db");
 const schema = require("./config/db/schema");
 const { sql, eq } = require("drizzle-orm");
 const express = require("express");
 const dotenv = require("dotenv");
 const passport = require("passport");
-require('./config/passport')
-const authRoutes = require('./routes/authRoutes')
+require("./config/passport");
+const authRoutes = require("./routes/authRoutes");
+const userRoutes = require("./routes/userRoutes");
 
 dotenv.config();
 
@@ -33,6 +33,7 @@ app.use((req, res, next) => {
 // });
 
 app.use("/api/auth", authRoutes);
+app.use("/api/user", userRoutes);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () =>
