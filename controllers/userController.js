@@ -90,3 +90,46 @@ exports.GetAddresses = async (req, res) => {
     res.status(500).send({ error: "Internal Server Error" });
   }
 };
+exports.AddAdress = async (req, res) => {
+  const {
+    name,
+    city,
+    house,
+    state,
+    street,
+    pinCode,
+    landmark,
+    country,
+    email,
+    number,
+  } = req.body;
+  try {
+    await db.insert(addresses).values({
+      name,
+      city,
+      house,
+      state,
+      street,
+      pinCode,
+      landmark,
+      country,
+      userEmail: email,
+      number,
+    });
+    const userAddresses = await db.query.addresses?.findMany({
+      where: eq(addresses.userEmail, email),
+    });
+    if (!userAddresses?.length) {
+      return res
+        .status(200)
+        .json({ message: "Successfully address added", addresses: [] });
+    }
+    return res.status(200).json({
+      message: "Successfully address added",
+      addresses: userAddresses,
+    });
+  } catch (error) {
+    console.error("Error querying user:", error);
+    res.status(500).send({ error: "Internal Server Error" });
+  }
+};
