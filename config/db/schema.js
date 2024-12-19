@@ -692,4 +692,5 @@ module.exports = {
   usersRelations,
   userVerifications,
   addresses,
+  orders
 };

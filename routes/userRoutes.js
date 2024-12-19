@@ -8,6 +8,8 @@ const {
   UpdateUserPassword,
   GetAddresses,
   AddAdress,
+  DeleteAddress,
+  GetAllYourOrders,
 } = require("../controllers/userController");
 const router = express.Router();
 
@@ -15,6 +17,8 @@ router.get("/findByEmail", authMiddleware, FindByEmail);
 router.post("/updateUserDetails", authMiddleware, UpdateUserDetails);
 router.post("/updateUserPassword", authMiddleware, UpdateUserPassword); //not done yet
 router.get("/getUserAddresses", authMiddleware, GetAddresses);
-router.post("/addAdress", authMiddleware, AddAdress);
+router.post("/addAddress", authMiddleware, AddAdress);
+router.post("/deleteAddress", authMiddleware, DeleteAddress);
+router.get("/getAllYourOrders", authMiddleware, GetAllYourOrders);
 
 module.exports = router;

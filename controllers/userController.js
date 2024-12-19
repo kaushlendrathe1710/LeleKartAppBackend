@@ -1,9 +1,8 @@
 const { db } = require("../config/db/db");
 const {
   users,
-  userVerifications,
-  accounts,
   addresses,
+  orders,
 } = require("../config/db/schema");
 const { eq } = require("drizzle-orm");
 const { validationResult } = require("express-validator");
@@ -90,6 +89,7 @@ exports.GetAddresses = async (req, res) => {
     res.status(500).send({ error: "Internal Server Error" });
   }
 };
+
 exports.AddAdress = async (req, res) => {
   const {
     name,
@@ -131,5 +131,54 @@ exports.AddAdress = async (req, res) => {
   } catch (error) {
     console.error("Error querying user:", error);
     res.status(500).send({ error: "Internal Server Error" });
+  }
+};
+
+exports.DeleteAddress = async (req, res) => {
+  const { id, email } = req.body;
+  try {
+    await db.delete(addresses).where(eq(addresses.id, id));
+    const userAddresses = await db.query.addresses?.findMany({
+      where: eq(addresses.userEmail, email),
+    });
+    if (!userAddresses?.length) {
+      return res
+        .status(200)
+        .json({ message: "Successfully deleted this address", addresses: [] });
+    }
+    return res.status(200).json({
+      message: "Successfully deleted this address",
+      addresses: userAddresses,
+    });
+  } catch (error) {
+    console.error("Error querying user:", error);
+    res.status(500).send({ error: "Internal Server Error" });
+  }
+};
+
+exports.GetAllYourOrders = async (req, res) => {
+  const { email } = req.body;
+  try {
+    const allOrders = db.query.orders.findMany({
+      where: eq(orders.userEmail, email),
+      with: {
+        shippingAddress: true,
+        orderItems: true,
+        cancelItems: true,
+      },
+    });
+    if (!allOrders?.length) {
+      return res.status(200).json({
+        message: "There is no orders, place your first order",
+        allOrders: [],
+      });
+    }
+    return res.status(200).json({
+      message: "All your orders",
+      allOrders: allOrders,
+    });
+  } catch (error) {
+        console.error("Error querying user:", error);
+        res.status(500).send({ error: "Internal Server Error" });
   }
 };
