@@ -1,9 +1,5 @@
 const { db } = require("../config/db/db");
-const {
-  users,
-  addresses,
-  orders,
-} = require("../config/db/schema");
+const { users, addresses, orders } = require("../config/db/schema");
 const { eq } = require("drizzle-orm");
 const { validationResult } = require("express-validator");
 
@@ -25,6 +21,7 @@ exports.FindByEmail = async (req, res) => {
 
 exports.UpdateUserDetails = async (req, res) => {
   const { name, phone, email, gender } = req.body;
+  console.log(name, phone, email, gender);
   if (!email) {
     return res.status(400).send({ error: "Email is required" });
   }
@@ -36,7 +33,7 @@ exports.UpdateUserDetails = async (req, res) => {
     const user = await db.query.users.findFirst({
       where: eq(users.email, email),
     });
-    return res.status(200).json({ updatedUser: user });
+    return res.status(200).json({ user: user });
   } catch (error) {
     console.error("Error querying user:", error);
     res.status(500).send({ error: "Internal Server Error" });
@@ -178,7 +175,7 @@ exports.GetAllYourOrders = async (req, res) => {
       allOrders: allOrders,
     });
   } catch (error) {
-        console.error("Error querying user:", error);
-        res.status(500).send({ error: "Internal Server Error" });
+    console.error("Error querying user:", error);
+    res.status(500).send({ error: "Internal Server Error" });
   }
 };

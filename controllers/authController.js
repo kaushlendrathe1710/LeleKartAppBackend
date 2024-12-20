@@ -25,23 +25,20 @@ const register = async (req, res) => {
       .then((rows) => rows[0]);
 
     if (existingUser) {
-      if (existingUser.role !== role) {
-        throw new Error("User exist for different role");
-      }
       if (existingUser.isApproved === "accepted") {
         throw new Error("User already exists");
       }
       //   return res.status(400).json({ message: "User already exists" });
       const hashedPassword = await bcrypt.hash(password, 10);
-      const verificationCode = crypto.randomInt(100000, 999999).toString();
-      const userName = `${role || "user"}${crypto.randomInt(100000, 999999)}`;
+      const verificationCode = crypto.randomInt(1000, 10000).toString();
+      // const userName = `${role || "user"}${crypto.randomInt(100000, 999999)}`;
 
       await db
         .update(users)
         .set({ password: hashedPassword })
         .where(eq(users.email, email));
 
-      const createdUser = await req.db
+       await req.db
         .select()
         .from(users)
         .where(eq(users.email, email))
@@ -87,10 +84,13 @@ const register = async (req, res) => {
       }
 
       //   console.log("Sending verification email...", updatedVerification);
-      await sendVerificationEmail(email, verificationCode);
+      const verificationData = await sendVerificationEmail(
+        email,
+        verificationCode
+      );
 
       console.log("Registration successful!");
-      res.status(201).json(createdUser);
+      res.status(201).json(verificationData);
       return;
     }
 
@@ -102,7 +102,7 @@ const register = async (req, res) => {
     await req.db.insert(users).values({
       email,
       password: hashedPassword,
-      role: role || "user",
+      role: "user",
       name: name || userName,
       phone: phone || "",
     });
@@ -121,10 +121,13 @@ const register = async (req, res) => {
     });
 
     console.log("Sending verification email...");
-    await sendVerificationEmail(email, verificationCode);
+    const verificationData = await sendVerificationEmail(
+      email,
+      verificationCode
+    );
 
     console.log("Registration successful!");
-    res.status(201).json(createdUser);
+    res.status(201).json(verificationData);
   } catch (error) {
     console.error("User creation error:", error.message);
     res.status(500).json({ message: "Internal server error" });
@@ -184,6 +187,7 @@ const login = async (req, res) => {
     });
 
     res.status(200).json({
+      message: "User Logged In successfully",
       token,
       user: {
         id: user.id,

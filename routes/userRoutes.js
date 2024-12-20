@@ -13,7 +13,7 @@ const {
 } = require("../controllers/userController");
 const router = express.Router();
 
-router.get("/findByEmail", authMiddleware, FindByEmail);
+router.post("/findByEmail", FindByEmail);
 router.post("/updateUserDetails", authMiddleware, UpdateUserDetails);
 router.post("/updateUserPassword", authMiddleware, UpdateUserPassword); //not done yet
 router.get("/getUserAddresses", authMiddleware, GetAddresses);
