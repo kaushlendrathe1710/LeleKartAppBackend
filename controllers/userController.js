@@ -152,10 +152,37 @@ exports.DeleteAddress = async (req, res) => {
   }
 };
 
+// exports.GetAllYourOrders = async (req, res) => {
+//   const { email } = req.body;
+//   try {
+//     const allOrders = db.query.orders.findMany({
+//       where: eq(orders.userEmail, email),
+//       with: {
+//         shippingAddress: true,
+//         orderItems: true,
+//         cancelItems: true,
+//       },
+//     });
+//     if (!allOrders?.length) {
+//       return res.status(200).json({
+//         message: "There is no orders, place your first order",
+//         allOrders: [],
+//       });
+//     }
+//     return res.status(200).json({
+//       message: "All your orders",
+//       allOrders: allOrders,
+//     });
+//   } catch (error) {
+//     console.error("Error querying user:", error);
+//     res.status(500).send({ error: "Internal Server Error" });
+//   }
+// };
 exports.GetAllYourOrders = async (req, res) => {
-  const { email } = req.body;
+  const { email } = req.query; // Use query parameters for GET requests
+  console.log(email,'email')
   try {
-    const allOrders = db.query.orders.findMany({
+    const allOrders = await db.query.orders.findMany({
       where: eq(orders.userEmail, email),
       with: {
         shippingAddress: true,
@@ -163,18 +190,20 @@ exports.GetAllYourOrders = async (req, res) => {
         cancelItems: true,
       },
     });
+
     if (!allOrders?.length) {
       return res.status(200).json({
-        message: "There is no orders, place your first order",
+        message: "There are no orders. Place your first order.",
         allOrders: [],
       });
     }
+
     return res.status(200).json({
       message: "All your orders",
       allOrders: allOrders,
     });
   } catch (error) {
     console.error("Error querying user:", error);
-    res.status(500).send({ error: "Internal Server Error" });
+    res.status(500).json({ error: "Internal Server Error" });
   }
 };
