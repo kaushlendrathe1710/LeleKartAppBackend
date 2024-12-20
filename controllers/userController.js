@@ -21,7 +21,6 @@ exports.FindByEmail = async (req, res) => {
 
 exports.UpdateUserDetails = async (req, res) => {
   const { name, phone, email, gender } = req.body;
-  console.log(name, phone, email, gender);
   if (!email) {
     return res.status(400).send({ error: "Email is required" });
   }
