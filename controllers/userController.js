@@ -71,7 +71,7 @@ exports.UpdateUserPassword = async (req, res) => {
 }; // not done yet
 
 exports.GetAddresses = async (req, res) => {
-  const { email } = req.body;
+  const { email } = req.query;
   try {
     const userAddresses = await db.query.addresses?.findMany({
       where: eq(addresses.userEmail, email),
@@ -152,35 +152,9 @@ exports.DeleteAddress = async (req, res) => {
   }
 };
 
-// exports.GetAllYourOrders = async (req, res) => {
-//   const { email } = req.body;
-//   try {
-//     const allOrders = db.query.orders.findMany({
-//       where: eq(orders.userEmail, email),
-//       with: {
-//         shippingAddress: true,
-//         orderItems: true,
-//         cancelItems: true,
-//       },
-//     });
-//     if (!allOrders?.length) {
-//       return res.status(200).json({
-//         message: "There is no orders, place your first order",
-//         allOrders: [],
-//       });
-//     }
-//     return res.status(200).json({
-//       message: "All your orders",
-//       allOrders: allOrders,
-//     });
-//   } catch (error) {
-//     console.error("Error querying user:", error);
-//     res.status(500).send({ error: "Internal Server Error" });
-//   }
-// };
 exports.GetAllYourOrders = async (req, res) => {
   const { email } = req.query; // Use query parameters for GET requests
-  console.log(email,'email')
+  console.log(email, "email");
   try {
     const allOrders = await db.query.orders.findMany({
       where: eq(orders.userEmail, email),
@@ -202,6 +176,24 @@ exports.GetAllYourOrders = async (req, res) => {
       message: "All your orders",
       allOrders: allOrders,
     });
+  } catch (error) {
+    console.error("Error querying user:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+exports.UpdateAddress = async (req, res) => {
+  const { email, id, ...updatedFields } = req.body; // Use query parameters for GET requests
+  console.log(email, "email");
+  try {
+    await req.db.update(addresses).set(updatedFields).where(eq(addresses.id, id));
+
+    const userAddresses = await db.query.addresses?.findMany({
+      where: eq(addresses.userEmail, email),
+    });
+    if (!userAddresses?.length) {
+      return res.status(200).json({ addresses: [] });
+    }
+    return res.status(200).json({ addresses: userAddresses , message: "Address updated successfully"});
   } catch (error) {
     console.error("Error querying user:", error);
     res.status(500).json({ error: "Internal Server Error" });
