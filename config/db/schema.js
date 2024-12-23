@@ -721,4 +721,6 @@ module.exports = {
   wishlistsRelations,
   reviewsRelations,
   cancelItems,
+  categories,
+  subCategories,
 };
