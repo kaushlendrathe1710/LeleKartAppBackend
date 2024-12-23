@@ -135,6 +135,7 @@ const register = async (req, res) => {
 };
 
 const login = async (req, res) => {
+  console.log("Login request received...");
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({ errors: errors.array() });
@@ -265,17 +266,115 @@ const verifyUserByOtp = async (req, res) => {
   }
 };
 
-const forgotPassword = async (req, res) => {};
+const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
 
-const verifyOtpForResetPassowrd = async (req, res) => {};
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
 
-const resetPassword = async (req, res) => {};
+    // Check if user exists
+    const user = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, email))
+      .then((rows) => rows[0]);
+
+    if (!user) {
+      return res
+        .status(404)
+        .json({ message: "User with this email does not exist" });
+    }
+
+    // Generate OTP
+       const otp = crypto.randomInt(1000, 10000).toString();
+
+    // Check if an OTP record already exists for this email
+    const existingOtp = await db
+      .select()
+      .from(userVerifications)
+      .where(eq(userVerifications.email, email))
+      .then((rows) => rows[0]);
+
+    if (existingOtp) {
+      // Update the existing OTP record
+      await db
+        .update(userVerifications)
+        .set({ verificationCode: otp, isVerified: false })
+        .where(eq(userVerifications.email, email));
+    } else {
+      // Insert a new OTP record
+      await db.insert(userVerifications).values({
+        email,
+        verificationCode: otp,
+        isVerified: false,
+      });
+    }
+
+    // Send the OTP to the user's email
+    await sendVerificationEmail(email, otp);
+
+    res.status(200).json({
+      message: "OTP has been sent to your email for password reset.",
+    });
+  } catch (error) {
+    console.error("Forgot Password Error:", error.message);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+
+const resetPassword = async (req, res) => {
+  try {
+    const { email, newPassword } = req.body;
+
+    if (!email || !newPassword) {
+      return res
+        .status(400)
+        .json({ message: "Email and new password are required" });
+    }
+
+    // Find the OTP record and ensure it is verified
+    const otpRecord = await db
+      .select()
+      .from(userVerifications)
+      .where(eq(userVerifications.email, email))
+      .then((rows) => rows[0]);
+
+    if (!otpRecord || !otpRecord.isVerified) {
+      return res
+        .status(400)
+        .json({ message: "OTP not verified or record not found" });
+    }
+
+    // Hash the new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update the user's password
+    await db
+      .update(users)
+      .set({ password: hashedPassword })
+      .where(eq(users.email, email));
+
+    // Optionally, invalidate the OTP after the password is reset
+    await db
+      .update(userVerifications)
+      .set({ isVerified: false, verificationCode: '' })
+      .where(eq(userVerifications.email, email));
+
+    res.status(200).json({ message: "Password has been reset successfully" });
+  } catch (error) {
+    console.error("Reset Password Error:", error.message);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
 
 module.exports = {
   register,
   login,
   verifyUserByOtp,
   forgotPassword,
-  verifyOtpForResetPassowrd,
+  // verifyOtpForResetPassowrd,
   resetPassword,
 };

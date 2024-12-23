@@ -70,6 +70,38 @@ exports.UpdateUserPassword = async (req, res) => {
   }
 }; // not done yet
 
+
+
+exports.GetAllYourOrders = async (req, res) => {
+  const { email } = req.query; // Use query parameters for GET requests
+  console.log(email, "email");
+  try {
+    const allOrders = await db.query.orders.findMany({
+      where: eq(orders.userEmail, email),
+      with: {
+        shippingAddress: true,
+        orderItems: true,
+        cancelItems: true,
+      },
+    });
+
+    if (!allOrders?.length) {
+      return res.status(200).json({
+        message: "There are no orders. Place your first order.",
+        allOrders: [],
+      });
+    }
+
+    return res.status(200).json({
+      message: "All your orders",
+      allOrders: allOrders,
+    });
+  } catch (error) {
+    console.error("Error querying user:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
 exports.GetAddresses = async (req, res) => {
   const { email } = req.query;
   try {
@@ -86,7 +118,7 @@ exports.GetAddresses = async (req, res) => {
   }
 };
 
-exports.AddAdress = async (req, res) => {
+exports.AddAddress = async (req, res) => {
   const {
     name,
     city,
@@ -132,6 +164,7 @@ exports.AddAdress = async (req, res) => {
 
 exports.DeleteAddress = async (req, res) => {
   const { id, email } = req.body;
+  console.log(email,id, "email");
   try {
     await db.delete(addresses).where(eq(addresses.id, id));
     const userAddresses = await db.query.addresses?.findMany({
@@ -152,35 +185,6 @@ exports.DeleteAddress = async (req, res) => {
   }
 };
 
-exports.GetAllYourOrders = async (req, res) => {
-  const { email } = req.query; // Use query parameters for GET requests
-  console.log(email, "email");
-  try {
-    const allOrders = await db.query.orders.findMany({
-      where: eq(orders.userEmail, email),
-      with: {
-        shippingAddress: true,
-        orderItems: true,
-        cancelItems: true,
-      },
-    });
-
-    if (!allOrders?.length) {
-      return res.status(200).json({
-        message: "There are no orders. Place your first order.",
-        allOrders: [],
-      });
-    }
-
-    return res.status(200).json({
-      message: "All your orders",
-      allOrders: allOrders,
-    });
-  } catch (error) {
-    console.error("Error querying user:", error);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
-};
 exports.UpdateAddress = async (req, res) => {
   const { email, id, ...updatedFields } = req.body; // Use query parameters for GET requests
   console.log(email, "email");
@@ -199,3 +203,4 @@ exports.UpdateAddress = async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
+

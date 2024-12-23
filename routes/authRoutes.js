@@ -2,7 +2,7 @@
 const { body } = require("express-validator");
 const passport = require("passport");
 const jwt = require("jsonwebtoken");
-const { register, login, verifyUserByOtp } = require("../controllers/authController");
+const { register, login, verifyUserByOtp, forgotPassword, resetPassword } = require("../controllers/authController");
 const { authMiddleware } = require("../middleware/auth");
 const { db, users } = require("../config/db/db");
 const { eq } = require("drizzle-orm");
@@ -40,6 +40,7 @@ router.get(
   "/google/callback",
   passport.authenticate("google", { session: false }),
   (req, res) => {
+console.log('google callback')
     try {
       // Generate JWT for the authenticated user
       const token = jwt.sign({ userId: req.user.id }, process.env.JWT_SECRET, {
@@ -47,7 +48,7 @@ router.get(
       });
 
       // Redirect to mobile app with token (or send token in response)
-      res.redirect(`yourapp://callback?token=${token}`);
+      res.redirect(`myapp://callback?token=${token}`);
     } catch (error) {
       res.status(500).json({ message: "Server error" });
     }
@@ -77,5 +78,8 @@ router.get("/profile", authMiddleware, async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
+
+router.post("/forgotPassword", forgotPassword)
+router.post("/resetPassword", resetPassword)
 
 module.exports = router;

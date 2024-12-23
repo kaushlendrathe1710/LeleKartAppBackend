@@ -1,4 +1,3 @@
-// db.js
 const { drizzle } = require("drizzle-orm/postgres-js");
 const postgres = require("postgres");
 const dotenv = require("dotenv");
@@ -6,23 +5,22 @@ const dotenv = require("dotenv");
 // Load environment variables
 dotenv.config();
 
-const schema = require("./schema");
-
-// Environment variables
 const { DATABASE_URL, NODE_ENV } = process.env;
+const isProduction = NODE_ENV === "production";
 
-// Cache the database connection in development
-const globalForDb = globalThis;
+// Set connection options
+const connectionOptions = isProduction
+  ? { ssl: { rejectUnauthorized: false } } // Enable SSL for production
+  : { max: 10 }; // Use pooling in development
 
-if (!globalForDb.conn) {
-  globalForDb.conn = postgres(DATABASE_URL);
+let connection;
+
+try {
+  connection = postgres(DATABASE_URL, connectionOptions);
+} catch (error) {
+  console.error("Failed to connect to the database:", error);
+  process.exit(1); // Exit the process if connection fails
 }
 
-const conn = globalForDb.conn;
-
-if (NODE_ENV !== "production") {
-  globalForDb.conn = conn;
-}
-
-// Export the database instance
-module.exports.db = drizzle(conn, { schema });
+const db = drizzle(connection, { schema: require("./schema") });
+module.exports.db = db;

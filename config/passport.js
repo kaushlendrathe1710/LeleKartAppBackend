@@ -14,6 +14,7 @@ passport.use(
       callbackURL: "/api/auth/google/callback",
     },
     async (accessToken, refreshToken, profile, done) => {
+      console.log("Google profile:", profile);
       try {
         // Check if user already exists
         const existingUser = await db.query.users.findFirst({
