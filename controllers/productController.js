@@ -154,5 +154,26 @@ const getProductsWithCategory = async (req, res) => {
     res.status(500).send({ error: "Internal Server Error" });
   }
 };
-
-module.exports = { getBanners, getCategories, getProductsWithCategory };
+const getBestSellers = async (req, res) => {
+  const queryProducts = await db.query.products.findMany({
+    where: eq(products.isApproved, "accepted"),
+    with: {
+      variants: {
+        with: {
+          variantImages: {
+            limit: 1,
+          },
+        },
+        limit: 1,
+      },
+    },
+    limit: 4,
+  });
+  res.json({ products: queryProducts });
+};
+module.exports = {
+  getBanners,
+  getCategories,
+  getProductsWithCategory,
+  getBestSellers,
+};
