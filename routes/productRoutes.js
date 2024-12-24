@@ -5,6 +5,7 @@ const {
   getCategories,
   getProductsWithCategory,
   getBestSellers,
+  getProduct,
 } = require("../controllers/productController");
 const router = express.Router();
 
@@ -14,6 +15,7 @@ router.get("/getBanners", getBanners);
 router.get("/getCategories", getCategories);
 router.get("/getProductsWithCategory", getProductsWithCategory);
 router.get("/getBestSellers", getBestSellers);
+router.get("/getProduct", getProduct);
 
 // for home page only end
 

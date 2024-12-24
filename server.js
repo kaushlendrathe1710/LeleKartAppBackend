@@ -23,15 +23,14 @@ app.use((req, res, next) => {
   next();
 });
 
-// app.get("/", async (req, res) => {
-//   try {
-//     console.log('api is running')
-//     res.status(200).json("api is running");
-//   } catch (error) {
-//     console.error("Error fetching cart:", error);
-//     res.status(500).json({ message: "Internal Server Error", error });
-//   }
-// });
+app.get("/", async (req, res) => {
+  try {
+    console.log("api is running");
+    res.status(200).json("api is running");
+  } catch (error) {
+    res.status(500).json({ message: "Internal Server Error", error });
+  }
+});
 
 app.use("/api/auth", authRoutes);
 app.use("/api/user", userRoutes);

@@ -25,7 +25,6 @@ const getCategories = async (req, res) => {
     res.status(500).send({ error: "Internal Server Error" });
   }
 };
-
 const getProductsWithCategory = async (req, res) => {
   try {
     const order = await db.query.adminDashboardValues.findFirst();
@@ -171,9 +170,35 @@ const getBestSellers = async (req, res) => {
   });
   res.json({ products: queryProducts });
 };
+const getProduct =async(req,res)=>{
+  const {productId} = req.body;
+  console.log(productId)
+  try {
+    const product = await db.query.products.findFirst({
+      where: eq(products.id, productId),
+      with: {
+        categories: true,
+        subCategories: true,
+        variants: {
+          with: {
+            variantImages: true,
+          },
+        },
+      },
+    });
+    if (product === undefined) {
+      throw new Error("Product Not Found");
+    }
+    res.status(200).json({ product: product });
+  } catch (error) {
+    console.error("Error fetching banners:", error);
+    res.status(500).send({ error: "Internal Server Error" });
+  }
+}
 module.exports = {
   getBanners,
   getCategories,
   getProductsWithCategory,
   getBestSellers,
+  getProduct,
 };
