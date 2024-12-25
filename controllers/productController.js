@@ -171,7 +171,7 @@ const getBestSellers = async (req, res) => {
   res.json({ products: queryProducts });
 };
 const getProduct =async(req,res)=>{
-  const {productId} = req.body;
+  const { productId } = req.query;
   console.log(productId)
   try {
     const product = await db.query.products.findFirst({
