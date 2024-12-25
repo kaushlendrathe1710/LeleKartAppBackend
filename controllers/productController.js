@@ -2,7 +2,7 @@
 const { db } = require("../config/db/db");
 const { products } = require("../config/db/schema");
 
-const { eq, sql } = require("drizzle-orm");
+const { eq, sql ,and,ne} = require("drizzle-orm");
 const getBanners = async (req, res) => {
   try {
     const banners = await db.query.banners.findMany();
@@ -195,10 +195,39 @@ const getProduct =async(req,res)=>{
     res.status(500).send({ error: "Internal Server Error" });
   }
 }
+const getProductsByCategory=async(req,res)=>{
+   const { id,productId } = req.query;
+   try {
+    const categoryProducts = await db.query.products.findMany({
+      where: and(
+        and(
+          eq(products.categoryId, id),
+          ne(products.id, productId)
+        ),
+        eq(products.isApproved, "accepted")
+      ),
+      with: {
+        variants: {
+          with: {
+            variantImages: {
+              limit: 1,
+            },
+          },
+        },
+      },
+      limit: 6,
+    });
+     res.status(200).json({ product: categoryProducts });
+   } catch (error) {
+     console.error("Error fetching banners:", error);
+     res.status(500).send({ error: "Internal Server Error" });
+   }
+}
 module.exports = {
   getBanners,
   getCategories,
   getProductsWithCategory,
   getBestSellers,
   getProduct,
+  getProductsByCategory,
 };
