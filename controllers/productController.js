@@ -274,6 +274,87 @@ const getProductsByCategoryAll = async (req, res) => {
   }
 };
 
+const getProductsByCategoryOrSubCategory = async (req, res) => {
+  const {
+    id,
+    subCategory = false,
+    page = 1,
+    limit = 10,
+    color,
+    size,
+    minPrice,
+    maxPrice,
+    order,
+  } = req.query;
+
+  try {
+    const offset = (page - 1) * limit;
+
+    // Determine whether to query for category or subcategory
+    const whereCondition =
+      subCategory === "true"
+        ? and(
+            eq(products.subCategoryId, id),
+            eq(products.isApproved, "accepted"),
+            color ? eq(products.color, color) : undefined,
+            size ? eq(products.size, size) : undefined,
+            minPrice ? gte(products.price, minPrice) : undefined,
+            maxPrice ? lte(products.price, maxPrice) : undefined
+          )
+        : and(
+            eq(products.categoryId, id),
+            eq(products.isApproved, "accepted"),
+            color ? eq(products.color, color) : undefined,
+            size ? eq(products.size, size) : undefined,
+            minPrice ? gte(products.price, minPrice) : undefined,
+            maxPrice ? lte(products.price, maxPrice) : undefined
+          );
+
+    // Fetch total products for pagination
+    const allProducts = await db.query.products.findMany({
+      where: whereCondition,
+    });
+    const totalProducts = allProducts.length;
+    const totalPages = Math.ceil(totalProducts / limit);
+
+    // Fetch paginated products
+    const paginatedProducts = await db.query.products.findMany({
+      where: whereCondition,
+      orderBy:
+        order === "1"
+          ? [asc(products.price)]
+          : order === "2"
+          ? [desc(products.price)]
+          : undefined,
+      with: {
+        variants: {
+          with: {
+            variantImages: {
+              limit: 1,
+            },
+          },
+        },
+      },
+      limit: parseInt(limit),
+      offset: offset,
+    });
+
+    res.status(200).json({
+      products: paginatedProducts,
+      pagination: {
+        totalProducts,
+        totalPages,
+        currentPage: parseInt(page),
+        limit: parseInt(limit),
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching products:", error);
+    res.status(500).send({ error: "Internal Server Error" });
+  }
+};
+
+
 module.exports = {
   getBanners,
   getCategories,
@@ -282,4 +363,6 @@ module.exports = {
   getProduct,
   getProductsByCategory,
   getProductsByCategoryAll,
+getProductsByCategoryOrSubCategory
+
 };

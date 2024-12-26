@@ -8,6 +8,7 @@ const {
   getProduct,
   getProductsByCategory,
   getProductsByCategoryAll,
+  getProductsByCategoryOrSubCategory,
 } = require("../controllers/productController");
 const router = express.Router();
 
@@ -20,6 +21,10 @@ router.get("/getBestSellers", getBestSellers);
 router.get("/getProduct", getProduct);
 router.get("/getProductsByCategory", getProductsByCategory); // for best recommendation
 router.get("/getProductsByCategoryAll", getProductsByCategoryAll);
+router.get(
+  "/getProductsByCategoryOrSubCategory",
+  getProductsByCategoryOrSubCategory
+);
 
 
 
