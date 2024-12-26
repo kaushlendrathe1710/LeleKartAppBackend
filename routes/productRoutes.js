@@ -19,6 +19,53 @@ router.get("/getBestSellers", getBestSellers);
 router.get("/getProduct", getProduct);
 router.get("/getProductsByCategory", getProductsByCategory);
 
+
+
+
+router.post("/checkPinCode", async (req, res) => {
+  try {
+    const body = req.body;
+
+    if (!body.Input_Pincode) {
+      return res.status(400).json({ error: "Pincode is required" });
+    }
+
+    console.log("Request Body:", body);
+
+    const url = `https://api.cept.gov.in/CommonFacilityMaster/api/values/Fetch_Facility`;
+
+    const options = {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json", // Ensure the API expects JSON
+        // Add other headers if needed (e.g., Authorization)
+      },
+      body: JSON.stringify(body),
+    };
+
+    const response = await fetch(url, options);
+
+    // Log the response status and headers
+    console.log("Response Status:", response.status);
+    console.log("Response Headers:", response.headers);
+
+    // If the response isn't OK, log the body to understand the error
+    if (!response.ok) {
+      const errorData = await response.text();
+      console.log("Error Response:", errorData);
+      throw new Error(`Failed to fetch data: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log("Response Data:", data);
+
+    return res.json(data);
+  } catch (err) {
+    console.error("Error in POST function:", err);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
 // for home page only end
 
 module.exports = router;
