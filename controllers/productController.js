@@ -195,7 +195,7 @@ const getProduct =async(req,res)=>{
     res.status(500).send({ error: "Internal Server Error" });
   }
 }
-const getProductsByCategory=async(req,res)=>{
+const getProductsByCategory=async(req,res)=>{ /// for best product recommendation 
    const { id,productId } = req.query;
    try {
     const categoryProducts = await db.query.products.findMany({
@@ -223,6 +223,57 @@ const getProductsByCategory=async(req,res)=>{
      res.status(500).send({ error: "Internal Server Error" });
    }
 }
+const getProductsByCategoryAll = async (req, res) => {
+  const { id, page = 1, limit = 10 } = req.query;
+  try {
+    // Get total count first using length of array
+    const allProducts = await db.query.products.findMany({
+      where: and(
+        eq(products.categoryId, id),
+        eq(products.isApproved, "accepted")
+      ),
+    });
+
+    const totalProducts = allProducts.length;
+
+    // Calculate pagination values
+    const totalPages = Math.ceil(totalProducts / limit);
+    const offset = (page - 1) * limit;
+
+    // Get paginated products
+    const categoryProducts = await db.query.products.findMany({
+      where: and(
+        eq(products.categoryId, id),
+        eq(products.isApproved, "accepted")
+      ),
+      with: {
+        variants: {
+          with: {
+            variantImages: {
+              limit: 1,
+            },
+          },
+        },
+      },
+      limit: limit,
+      offset: offset,
+    });
+
+    res.status(200).json({
+      products: categoryProducts,
+      pagination: {
+        totalProducts,
+        totalPages,
+        currentPage: page,
+        limit,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching products:", error);
+    res.status(500).send({ error: "Internal Server Error" });
+  }
+};
+
 module.exports = {
   getBanners,
   getCategories,
@@ -230,4 +281,5 @@ module.exports = {
   getBestSellers,
   getProduct,
   getProductsByCategory,
+  getProductsByCategoryAll,
 };
