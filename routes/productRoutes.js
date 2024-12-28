@@ -9,6 +9,11 @@ const {
   getProductsByCategory,
   getProductsByCategoryAll,
   getProductsByCategoryOrSubCategory,
+  initializeCart,
+  addToCart,
+  removeFromCart,
+  updateQueantityInCart,
+  subTotalInCart,
 } = require("../controllers/productController");
 const router = express.Router();
 
@@ -25,9 +30,11 @@ router.get(
   "/getProductsByCategoryOrSubCategory",
   getProductsByCategoryOrSubCategory
 );
-
-
-
+router.post("/initializeCart", initializeCart);
+router.post("/addToCart", addToCart);
+router.post("/removeFromCart", removeFromCart);
+router.post("/updateQuantityInCart", updateQueantityInCart);
+router.get("/subTotalInCart", subTotalInCart);
 
 router.post("/checkPinCode", async (req, res) => {
   try {

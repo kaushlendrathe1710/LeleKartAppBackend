@@ -1,8 +1,8 @@
 // backend/src/controllers/auth.js
 const { db } = require("../config/db/db");
-const { products } = require("../config/db/schema");
+const { products, carts } = require("../config/db/schema");
 
-const { eq, sql ,and,ne} = require("drizzle-orm");
+const { eq, sql, and, ne } = require("drizzle-orm");
 const getBanners = async (req, res) => {
   try {
     const banners = await db.query.banners.findMany();
@@ -170,9 +170,9 @@ const getBestSellers = async (req, res) => {
   });
   res.json({ products: queryProducts });
 };
-const getProduct =async(req,res)=>{
+const getProduct = async (req, res) => {
   const { productId } = req.query;
-  console.log(productId)
+  console.log(productId);
   try {
     const product = await db.query.products.findFirst({
       where: eq(products.id, productId),
@@ -194,16 +194,14 @@ const getProduct =async(req,res)=>{
     console.error("Error fetching banners:", error);
     res.status(500).send({ error: "Internal Server Error" });
   }
-}
-const getProductsByCategory=async(req,res)=>{ /// for best product recommendation 
-   const { id,productId } = req.query;
-   try {
+};
+const getProductsByCategory = async (req, res) => {
+  /// for best product recommendation
+  const { id, productId } = req.query;
+  try {
     const categoryProducts = await db.query.products.findMany({
       where: and(
-        and(
-          eq(products.categoryId, id),
-          ne(products.id, productId)
-        ),
+        and(eq(products.categoryId, id), ne(products.id, productId)),
         eq(products.isApproved, "accepted")
       ),
       with: {
@@ -217,12 +215,12 @@ const getProductsByCategory=async(req,res)=>{ /// for best product recommendatio
       },
       limit: 6,
     });
-     res.status(200).json({ product: categoryProducts });
-   } catch (error) {
-     console.error("Error fetching banners:", error);
-     res.status(500).send({ error: "Internal Server Error" });
-   }
-}
+    res.status(200).json({ product: categoryProducts });
+  } catch (error) {
+    console.error("Error fetching banners:", error);
+    res.status(500).send({ error: "Internal Server Error" });
+  }
+};
 const getProductsByCategoryAll = async (req, res) => {
   const { id, page = 1, limit = 10 } = req.query;
   try {
@@ -353,7 +351,153 @@ const getProductsByCategoryOrSubCategory = async (req, res) => {
     res.status(500).send({ error: "Internal Server Error" });
   }
 };
+const initializeCart = async (req, res) => {
+  console.log(req.body);
+  try {
+    const {email}=req.body
+    const userCart = await db.query.carts.findFirst({
+      where: eq(carts.userEmail, email),
+      with: {
+        cartProducts: true,
+      },
+    });
 
+    if (!userCart) {
+      await ctx.db.insert(carts).values({ userEmail: email });
+      const newCart = await db.query.carts.findFirst({
+        where: eq(carts.userEmail, email),
+        with: {
+          cartProducts: true,
+        },
+      });
+      return newCart;
+    }
+
+    res.json(userCart);
+    return userCart;
+  } catch (error) {
+    console.log(error.message);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+const addToCart = async (req, res) => {
+  try {
+    const { userEmail, productId, variantId, quantity, cartId } = req.body;
+
+    let cartProduct = await CartProduct.findOne({
+      cartId,
+      productId,
+      variantId: variantId || null,
+    });
+
+    if (cartProduct) {
+      // Update quantity if product exists
+      cartProduct.quantity += quantity;
+      await cartProduct.save();
+    } else {
+      // Create new cart product if it doesn't exist
+      cartProduct = await CartProduct.create({
+        cartId,
+        productId,
+        variantId: variantId || null,
+        quantity,
+      });
+    }
+
+    res.json(cartProduct);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+const removeFromCart = async (req, res) => {
+  try {
+    const { cartId, productId, variantId } = req.body;
+
+    await CartProduct.deleteOne({
+      cartId,
+      productId,
+      variantId: variantId || null,
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+const updateQueantityInCart = async (req, res) => {
+  try {
+    const { cartId, productId, variantId, quantity } = req.body;
+
+    if (quantity > 0) {
+      const cartProduct = await CartProduct.findOneAndUpdate(
+        {
+          cartId,
+          productId,
+          variantId: variantId || null,
+        },
+        { quantity },
+        { new: true }
+      );
+      res.json(cartProduct);
+    } else {
+      await CartProduct.deleteOne({
+        cartId,
+        productId,
+        variantId: variantId || null,
+      });
+      res.json({ success: true });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+const subTotalInCart = async (req, res) => {
+  try {
+    const { email, coupon } = req.query;
+
+    const cart = await Cart.findOne({ userEmail: email }).populate({
+      path: "cartProducts",
+      populate: [{ path: "product", populate: "vendor" }, { path: "variant" }],
+    });
+
+    if (!cart) {
+      return res.json({ subtotal: 0, minOrder: 0 });
+    }
+
+    let subtotal = cart.cartProducts.reduce((acc, cartProduct) => {
+      const price = cartProduct.variant
+        ? cartProduct.variant.price
+        : cartProduct.product.price;
+      return acc + price * cartProduct.quantity;
+    }, 0);
+
+    let minOrder = cart.cartProducts.reduce((acc, cartProduct) => {
+      const minPrice =
+        cartProduct.product.vendor.minOrderPrice >
+        cartProduct.product.price * cartProduct.quantity
+          ? 50
+          : 0;
+      return acc + minPrice;
+    }, 0);
+
+    if (coupon) {
+      const validCoupon = await Coupon.findOne({ couponCode: coupon });
+      if (validCoupon) {
+        subtotal = Math.floor(
+          subtotal - (subtotal * validCoupon.discount) / 100
+        );
+      }
+    }
+
+    res.json({
+      subtotal,
+      minOrder: subtotal < 500 ? minOrder + 50 : minOrder,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
 
 module.exports = {
   getBanners,
@@ -363,6 +507,10 @@ module.exports = {
   getProduct,
   getProductsByCategory,
   getProductsByCategoryAll,
-getProductsByCategoryOrSubCategory
-
+  getProductsByCategoryOrSubCategory,
+  initializeCart,
+  addToCart,
+  removeFromCart,
+  updateQueantityInCart,
+  subTotalInCart,
 };
