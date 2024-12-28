@@ -409,6 +409,8 @@ const isPresentInCart = async (req, res) => {
     return false;
   } catch {}
 };
+
+//done
 const getCart = async (req, res) => {
   try {
     const { email } = req.query;
@@ -438,95 +440,7 @@ console.log(email)
   }
 };
 
-const addToCart = async (req, res) => {
-  const { userEmail, productId, variantId, quantity, cartId } = req.body;
-  try {
-    if (variantId) {
-      const existingCartProduct = await db.query.cartProducts.findFirst({
-        where: and(
-          eq(cartProducts.cartId, cartId),
-          eq(cartProducts.productId, productId),
-          eq(cartProducts.variantId, variantId)
-        ),
-      });
-
-      if (existingCartProduct) {
-        const updatedProduct = await db
-          .update(cartProducts)
-          .set({
-            quantity: existingCartProduct.quantity + quantity,
-          })
-          .where(eq(cartProducts.id, existingCartProduct.id));
-
-        return updatedProduct;
-      } else {
-        const newCartProduct = await db.insert(cartProducts).values({
-          cartId: cartId,
-          productId: productId,
-          variantId: variantId,
-          quantity: quantity,
-        });
-
-        return newCartProduct;
-      }
-    }
-
-    const existingCartProduct = await db.query.cartProducts.findFirst({
-      where: and(
-        eq(cartProducts.cartId, cartId),
-        eq(cartProducts.productId, productId),
-        isNull(cartProducts.variantId)
-      ),
-    });
-
-    if (existingCartProduct) {
-      const updatedProduct = await db
-        .update(cartProducts)
-        .set({
-          quantity: existingCartProduct.quantity + quantity,
-        })
-        .where(eq(cartProducts.id, existingCartProduct.id));
-
-      return updatedProduct;
-    } else {
-      const newCartProduct = await db.insert(cartProducts).values({
-        cartId: cartId,
-        productId: productId,
-        variantId: null,
-        quantity: quantity,
-      });
-
-      return newCartProduct;
-    }
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
-const removeFromCart = async (req, res) => {
-  try {
-    if (variantId) {
-      const existingCartProduct = await db.query.cartProducts.findFirst({
-        where: and(
-          eq(cartProducts.cartId, cartId),
-          eq(cartProducts.productId, productId),
-          eq(cartProducts.variantId, variantId)
-        ),
-      });
-
-      if (existingCartProduct) {
-        const removedProduct = await db
-          .delete(cartProducts)
-          .where(eq(cartProducts.id, existingCartProduct.id));
-        res.json({ success: true });
-        return removedProduct;
-      } else {
-        throw new Error("Product not found in cart");
-      }
-    }
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
+//done
 const updateQuantityInCart = async (req, res) => {
   try {
     const { userEmail, productId, variantId, quantity, cartId } = req.body;
@@ -619,6 +533,122 @@ const updateQuantityInCart = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+const addToCart = async (req, res) => {
+  const { userEmail, productId, variantId, quantity, cartId } = req.body;
+  try {
+    // Check if the variantId exists
+    if (variantId) {
+      // Check if the product with the specific variant already exists in the cart
+      const existingCartProduct = await db.query.cartProducts.findFirst({
+        where: and(
+          eq(cartProducts.cartId, cartId),
+          eq(cartProducts.productId, productId),
+          eq(cartProducts.variantId, variantId)
+        ),
+      });
+
+      if (existingCartProduct) {
+        // If the product already exists, update the quantity
+        const updatedProduct = await db
+          .update(cartProducts)
+          .set({
+            quantity: existingCartProduct.quantity + quantity,
+          })
+          .where(eq(cartProducts.id, existingCartProduct.id));
+
+        // Respond with the updated product
+        return res
+          .status(200)
+          .json({
+            message: "Product updated in cart",
+            product: updatedProduct,
+          });
+      } else {
+        // If the product doesn't exist, insert a new cart item
+        const newCartProduct = await db.insert(cartProducts).values({
+          cartId: cartId,
+          productId: productId,
+          variantId: variantId,
+          quantity: quantity,
+        });
+
+        // Respond with the newly added product
+        return res
+          .status(201)
+          .json({ message: "Product added to cart", product: newCartProduct });
+      }
+    }
+
+    // If variantId is not provided, handle the product without variant
+    const existingCartProduct = await db.query.cartProducts.findFirst({
+      where: and(
+        eq(cartProducts.cartId, cartId),
+        eq(cartProducts.productId, productId),
+        isNull(cartProducts.variantId)
+      ),
+    });
+
+    if (existingCartProduct) {
+      // If the product exists without a variant, update the quantity
+      const updatedProduct = await db
+        .update(cartProducts)
+        .set({
+          quantity: existingCartProduct.quantity + quantity,
+        })
+        .where(eq(cartProducts.id, existingCartProduct.id));
+
+      // Respond with the updated product
+      return res
+        .status(200)
+        .json({ message: "Product updated in cart", product: updatedProduct });
+    } else {
+      // If the product doesn't exist without a variant, insert a new cart item
+      const newCartProduct = await db.insert(cartProducts).values({
+        cartId: cartId,
+        productId: productId,
+        variantId: null,
+        quantity: quantity,
+      });
+
+      // Respond with the newly added product
+      return res
+        .status(201)
+        .json({ message: "Product added to cart", product: newCartProduct });
+    }
+  } catch (error) {
+    // Log the error and respond with a 500 status and error message
+    console.log(error, "error");
+    return res.status(500).json({ error: error.message });
+  }
+};
+
+
+const removeFromCart = async (req, res) => {
+  try {
+    if (variantId) {
+      const existingCartProduct = await db.query.cartProducts.findFirst({
+        where: and(
+          eq(cartProducts.cartId, cartId),
+          eq(cartProducts.productId, productId),
+          eq(cartProducts.variantId, variantId)
+        ),
+      });
+
+      if (existingCartProduct) {
+        const removedProduct = await db
+          .delete(cartProducts)
+          .where(eq(cartProducts.id, existingCartProduct.id));
+        res.json({ success: true });
+        return removedProduct;
+      } else {
+        throw new Error("Product not found in cart");
+      }
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 
 
 
