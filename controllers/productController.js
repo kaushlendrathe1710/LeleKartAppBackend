@@ -1,8 +1,8 @@
 // backend/src/controllers/auth.js
 const { db } = require("../config/db/db");
-const { products, carts } = require("../config/db/schema");
+const { products, carts, cartProducts } = require("../config/db/schema");
 
-const { eq, sql, and, ne } = require("drizzle-orm");
+const { eq, sql, and, ne, isNull } = require("drizzle-orm");
 const getBanners = async (req, res) => {
   try {
     const banners = await db.query.banners.findMany();
@@ -34,7 +34,7 @@ const getProductsWithCategory = async (req, res) => {
     const rotationOrder = order.rotationOrder;
 
     if (rotationOrder === "priceHighToLow") {
-      const data = await ctx.db.query.categories.findMany({
+      const data = await db.query.categories.findMany({
         with: {
           products: {
             where: eq(products.isApproved, "accepted"),
@@ -354,7 +354,7 @@ const getProductsByCategoryOrSubCategory = async (req, res) => {
 const initializeCart = async (req, res) => {
   console.log(req.body);
   try {
-    const {email}=req.body
+    const { email } = req.body;
     const userCart = await db.query.carts.findFirst({
       where: eq(carts.userEmail, email),
       with: {
@@ -363,7 +363,7 @@ const initializeCart = async (req, res) => {
     });
 
     if (!userCart) {
-      await ctx.db.insert(carts).values({ userEmail: email });
+      await db.insert(carts).values({ userEmail: email });
       const newCart = await db.query.carts.findFirst({
         where: eq(carts.userEmail, email),
         with: {
@@ -380,120 +380,353 @@ const initializeCart = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
-
-const addToCart = async (req, res) => {
+const isPresentInCart = async (req, res) => {
+  const { variantId, cartId } = req.query;
   try {
-    const { userEmail, productId, variantId, quantity, cartId } = req.body;
-
-    let cartProduct = await CartProduct.findOne({
-      cartId,
-      productId,
-      variantId: variantId || null,
+    if (variantId) {
+      const variant = await db.query.cartProducts.findFirst({
+        where: and(
+          eq(cartProducts.variantId, variantId),
+          eq(cartProducts.cartId, cartId)
+        ),
+      });
+      if (variant) {
+        return true;
+      }
+      return false;
+    }
+    const product = await db.query.cartProducts.findFirst({
+      where: and(
+        eq(cartProducts.productId, productId),
+        eq(cartProducts.cartId, cartId)
+      ),
     });
 
-    if (cartProduct) {
-      // Update quantity if product exists
-      cartProduct.quantity += quantity;
-      await cartProduct.save();
-    } else {
-      // Create new cart product if it doesn't exist
-      cartProduct = await CartProduct.create({
-        cartId,
-        productId,
-        variantId: variantId || null,
-        quantity,
-      });
+    if (product) {
+      return true;
     }
 
-    res.json(cartProduct);
+    return false;
+  } catch {}
+};
+const getCart = async (req, res) => {
+  try {
+    const { email } = req.query;
+console.log(email)
+    const userCart = await db.query.carts.findFirst({
+      where: eq(carts.userEmail, email),
+      with: {
+        cartProducts: true,
+      },
+    });
+
+    if (!userCart) {
+      await db.insert(carts).values({ userEmail: email });
+      const newCart = await db.query.carts.findFirst({
+        where: eq(carts.userEmail, email),
+        with: {
+          cartProducts: true,
+        },
+      });
+      return newCart;
+    }
+
+    res.json(userCart);
+    return userCart;
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+const addToCart = async (req, res) => {
+  const { userEmail, productId, variantId, quantity, cartId } = req.body;
+  try {
+    if (variantId) {
+      const existingCartProduct = await db.query.cartProducts.findFirst({
+        where: and(
+          eq(cartProducts.cartId, cartId),
+          eq(cartProducts.productId, productId),
+          eq(cartProducts.variantId, variantId)
+        ),
+      });
+
+      if (existingCartProduct) {
+        const updatedProduct = await db
+          .update(cartProducts)
+          .set({
+            quantity: existingCartProduct.quantity + quantity,
+          })
+          .where(eq(cartProducts.id, existingCartProduct.id));
+
+        return updatedProduct;
+      } else {
+        const newCartProduct = await db.insert(cartProducts).values({
+          cartId: cartId,
+          productId: productId,
+          variantId: variantId,
+          quantity: quantity,
+        });
+
+        return newCartProduct;
+      }
+    }
+
+    const existingCartProduct = await db.query.cartProducts.findFirst({
+      where: and(
+        eq(cartProducts.cartId, cartId),
+        eq(cartProducts.productId, productId),
+        isNull(cartProducts.variantId)
+      ),
+    });
+
+    if (existingCartProduct) {
+      const updatedProduct = await db
+        .update(cartProducts)
+        .set({
+          quantity: existingCartProduct.quantity + quantity,
+        })
+        .where(eq(cartProducts.id, existingCartProduct.id));
+
+      return updatedProduct;
+    } else {
+      const newCartProduct = await db.insert(cartProducts).values({
+        cartId: cartId,
+        productId: productId,
+        variantId: null,
+        quantity: quantity,
+      });
+
+      return newCartProduct;
+    }
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 const removeFromCart = async (req, res) => {
   try {
-    const { cartId, productId, variantId } = req.body;
-
-    await CartProduct.deleteOne({
-      cartId,
-      productId,
-      variantId: variantId || null,
-    });
-
-    res.json({ success: true });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
-const updateQueantityInCart = async (req, res) => {
-  try {
-    const { cartId, productId, variantId, quantity } = req.body;
-
-    if (quantity > 0) {
-      const cartProduct = await CartProduct.findOneAndUpdate(
-        {
-          cartId,
-          productId,
-          variantId: variantId || null,
-        },
-        { quantity },
-        { new: true }
-      );
-      res.json(cartProduct);
-    } else {
-      await CartProduct.deleteOne({
-        cartId,
-        productId,
-        variantId: variantId || null,
+    if (variantId) {
+      const existingCartProduct = await db.query.cartProducts.findFirst({
+        where: and(
+          eq(cartProducts.cartId, cartId),
+          eq(cartProducts.productId, productId),
+          eq(cartProducts.variantId, variantId)
+        ),
       });
-      res.json({ success: true });
+
+      if (existingCartProduct) {
+        const removedProduct = await db
+          .delete(cartProducts)
+          .where(eq(cartProducts.id, existingCartProduct.id));
+        res.json({ success: true });
+        return removedProduct;
+      } else {
+        throw new Error("Product not found in cart");
+      }
     }
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
+const updateQuantityInCart = async (req, res) => {
+  try {
+    const { userEmail, productId, variantId, quantity, cartId } = req.body;
+    console.log("Request Body:", req.body); // Log the incoming request
+
+    // If a variantId is provided
+    if (variantId !== null && variantId !== undefined) {
+      console.log("Checking for variantId:", variantId);
+
+      const existingCartProduct = await db.query.cartProducts.findFirst({
+        where: and(
+          eq(cartProducts.cartId, cartId),
+          eq(cartProducts.productId, productId),
+          eq(cartProducts.variantId, variantId) // Check for specific variantId
+        ),
+      });
+
+      if (existingCartProduct) {
+        console.log("Existing Cart Product Found:", existingCartProduct);
+
+        if (quantity > 0) {
+          const updatedProduct = await db
+            .update(cartProducts)
+            .set({
+              quantity: quantity,
+            })
+            .where(eq(cartProducts.id, existingCartProduct.id));
+
+          console.log("Updated Product:", updatedProduct);
+          res.json(updatedProduct); // Return the updated product
+        } else {
+          const removedProduct = await db
+            .delete(cartProducts)
+            .where(eq(cartProducts.id, existingCartProduct.id));
+
+          console.log("Removed Product:", removedProduct);
+          res.json(removedProduct); // Return the removed product
+        }
+      } else {
+        console.log("Product not found with specified variant");
+        res.status(404).json({
+          error: `Product not found in cart with specified variant. CartId: ${cartId}, ProductId: ${productId}, VariantId: ${variantId}`,
+        });
+      }
+    } else {
+      // If no variantId is provided (i.e., it's null or undefined), find the product without a variantId
+      console.log("Checking for variantId null:", variantId);
+
+      const existingCartProduct = await db.query.cartProducts.findFirst({
+        where: and(
+          eq(cartProducts.cartId, cartId),
+          eq(cartProducts.productId, productId),
+          isNull(cartProducts.variantId) // Check if variantId is null
+        ),
+      });
+
+      if (existingCartProduct) {
+        console.log(
+          "Existing Cart Product Found (no variant):",
+          existingCartProduct
+        );
+
+        if (quantity > 0) {
+          const updatedProduct = await db
+            .update(cartProducts)
+            .set({
+              quantity: quantity,
+            })
+            .where(eq(cartProducts.id, existingCartProduct.id));
+
+          console.log("Updated Product (no variant):", updatedProduct);
+          res.json(updatedProduct); // Return the updated product
+        } else {
+          const removedProduct = await db
+            .delete(cartProducts)
+            .where(eq(cartProducts.id, existingCartProduct.id));
+
+          console.log("Removed Product (no variant):", removedProduct);
+          res.json(removedProduct); // Return the removed product
+        }
+      } else {
+        console.log("Product not found without variant");
+        res.status(404).json({
+          error: `Product not found in cart without variant. CartId: ${cartId}, ProductId: ${productId}, VariantId: null`,
+        });
+      }
+    }
+  } catch (error) {
+    console.log("Error:", error.message); // Log the error message
+    res.status(500).json({ error: error.message });
+  }
+};
+
+
+
+
+
+
 const subTotalInCart = async (req, res) => {
   try {
-    const { email, coupon } = req.query;
-
-    const cart = await Cart.findOne({ userEmail: email }).populate({
-      path: "cartProducts",
-      populate: [{ path: "product", populate: "vendor" }, { path: "variant" }],
+    console.log(coupon);
+    if (pId) {
+      const singleProductDetails = await db.query.products.findFirst({
+        where: eq(products.id, pId),
+        with: {
+          vendors: true,
+        },
+      });
+      if (!singleProductDetails) {
+        throw new Error("Product Not Found");
+      }
+      const minRequired = singleProductDetails.vendors.minOrderPrice;
+      if (vId) {
+        const variantPrice = await db
+          .select({ price: variants.price })
+          .from(variants)
+          .where(eq(variants.id, vId))
+          .limit(1);
+        return {
+          subtotal: variantPrice[0]?.price ? variantPrice[0]?.price : 0,
+          minOrder: variantPrice[0]?.price
+            ? variantPrice[0]?.price < minRequired
+              ? variantPrice[0].price < 500
+                ? 100
+                : 50
+              : 0
+            : 0,
+        };
+      } else {
+        const productPrice = await db
+          .select({ price: products.price })
+          .from(products)
+          .where(eq(products.id, pId))
+          .limit(1);
+        return {
+          subtotal: productPrice?.[0]?.price ? productPrice[0].price : 0,
+          minOrder: productPrice[0]?.price
+            ? productPrice[0]?.price < minRequired
+              ? productPrice[0].price < 500
+                ? 100
+                : 50
+              : 0
+            : 0,
+        };
+      }
+    }
+    const userCart = await db.query.carts.findFirst({
+      where: eq(carts.userEmail, email),
+      with: {
+        cartProducts: true,
+      },
     });
 
-    if (!cart) {
-      return res.json({ subtotal: 0, minOrder: 0 });
+    if (!userCart) {
+      return { subtotal: 0, minOrder: 0 };
     }
 
-    let subtotal = cart.cartProducts.reduce((acc, cartProduct) => {
-      const price = cartProduct.variant
-        ? cartProduct.variant.price
-        : cartProduct.product.price;
+    const cartProductsDetails = await db.query.cartProducts.findMany({
+      where: eq(cartProducts.cartId, userCart.id),
+      with: {
+        products: {
+          with: {
+            vendors: true,
+          },
+        },
+        variants: true,
+      },
+    });
+
+    const subtotal = cartProductsDetails.reduce((acc, cartProduct) => {
+      const price = cartProduct.variants
+        ? cartProduct.variants.price
+        : cartProduct.products.price;
       return acc + price * cartProduct.quantity;
     }, 0);
-
-    let minOrder = cart.cartProducts.reduce((acc, cartProduct) => {
+    const minOrder = cartProductsDetails.reduce((acc, cartProduct) => {
       const minPrice =
-        cartProduct.product.vendor.minOrderPrice >
-        cartProduct.product.price * cartProduct.quantity
+        cartProduct.products.vendors.minOrderPrice >
+        cartProduct.products.price * cartProduct.quantity
           ? 50
           : 0;
       return acc + minPrice;
     }, 0);
 
+    let discountSubtotal = 0;
     if (coupon) {
-      const validCoupon = await Coupon.findOne({ couponCode: coupon });
+      const validCoupon = await db.query.coupons.findFirst({
+        where: eq(coupons.couponCode, coupon),
+      });
       if (validCoupon) {
-        subtotal = Math.floor(
+        discountSubtotal = Math.floor(
           subtotal - (subtotal * validCoupon.discount) / 100
         );
       }
     }
-
-    res.json({
-      subtotal,
-      minOrder: subtotal < 500 ? minOrder + 50 : minOrder,
-    });
+    const finalPrice = discountSubtotal === 0 ? subtotal : discountSubtotal;
+    return {
+      subtotal: finalPrice,
+      minOrder: finalPrice < 500 ? minOrder + 50 : minOrder,
+    };
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -511,6 +744,7 @@ module.exports = {
   initializeCart,
   addToCart,
   removeFromCart,
-  updateQueantityInCart,
+  updateQuantityInCart,
   subTotalInCart,
+  getCart,
 };

@@ -14,6 +14,8 @@ const {
   removeFromCart,
   updateQueantityInCart,
   subTotalInCart,
+  getCart,
+  updateQuantityInCart,
 } = require("../controllers/productController");
 const router = express.Router();
 
@@ -31,9 +33,10 @@ router.get(
   getProductsByCategoryOrSubCategory
 );
 router.post("/initializeCart", initializeCart);
+router.get("/getCart", getCart);
 router.post("/addToCart", addToCart);
 router.post("/removeFromCart", removeFromCart);
-router.post("/updateQuantityInCart", updateQueantityInCart);
+router.post("/updateQuantityInCart", updateQuantityInCart);
 router.get("/subTotalInCart", subTotalInCart);
 
 router.post("/checkPinCode", async (req, res) => {
