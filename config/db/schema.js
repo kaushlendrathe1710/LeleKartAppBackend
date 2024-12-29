@@ -723,4 +723,5 @@ module.exports = {
   cancelItems,
   categories,
   subCategories,
+  vendors,
 };

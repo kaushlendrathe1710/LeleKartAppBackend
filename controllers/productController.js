@@ -1,8 +1,14 @@
 // backend/src/controllers/auth.js
+const { query } = require("express");
 const { db } = require("../config/db/db");
-const { products, carts, cartProducts } = require("../config/db/schema");
+const {
+  products,
+  carts,
+  cartProducts,
+  vendors,
+} = require("../config/db/schema");
 
-const { eq, sql, and, ne, isNull } = require("drizzle-orm");
+const { eq, sql, and, ne, isNull, } = require("drizzle-orm");
 const getBanners = async (req, res) => {
   try {
     const banners = await db.query.banners.findMany();
@@ -414,7 +420,7 @@ const isPresentInCart = async (req, res) => {
 const getCart = async (req, res) => {
   try {
     const { email } = req.query;
-console.log(email)
+    console.log(email);
     const userCart = await db.query.carts.findFirst({
       where: eq(carts.userEmail, email),
       with: {
@@ -533,6 +539,8 @@ const updateQuantityInCart = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+//done
 const addToCart = async (req, res) => {
   const { userEmail, productId, variantId, quantity, cartId } = req.body;
   try {
@@ -557,12 +565,10 @@ const addToCart = async (req, res) => {
           .where(eq(cartProducts.id, existingCartProduct.id));
 
         // Respond with the updated product
-        return res
-          .status(200)
-          .json({
-            message: "Product updated in cart",
-            product: updatedProduct,
-          });
+        return res.status(200).json({
+          message: "Product updated in cart",
+          product: updatedProduct,
+        });
       } else {
         // If the product doesn't exist, insert a new cart item
         const newCartProduct = await db.insert(cartProducts).values({
@@ -622,7 +628,6 @@ const addToCart = async (req, res) => {
   }
 };
 
-
 const removeFromCart = async (req, res) => {
   try {
     if (variantId) {
@@ -649,15 +654,16 @@ const removeFromCart = async (req, res) => {
   }
 };
 
-
-
-
-
-
-
 const subTotalInCart = async (req, res) => {
+  const { pId, email, coupon,vId } = req.query;
+  // pId = productId
+  // vId= varientId
+  {
+    pId;
+  }
+  console.log(pId, email, "email");
   try {
-    console.log(coupon);
+    // console.log(coupon);
     if (pId) {
       const singleProductDetails = await db.query.products.findFirst({
         where: eq(products.id, pId),
@@ -709,10 +715,10 @@ const subTotalInCart = async (req, res) => {
         cartProducts: true,
       },
     });
-
     if (!userCart) {
       return { subtotal: 0, minOrder: 0 };
     }
+    console.log(userCart.id, "userCart");
 
     const cartProductsDetails = await db.query.cartProducts.findMany({
       where: eq(cartProducts.cartId, userCart.id),
@@ -725,7 +731,6 @@ const subTotalInCart = async (req, res) => {
         variants: true,
       },
     });
-
     const subtotal = cartProductsDetails.reduce((acc, cartProduct) => {
       const price = cartProduct.variants
         ? cartProduct.variants.price
@@ -753,11 +758,16 @@ const subTotalInCart = async (req, res) => {
       }
     }
     const finalPrice = discountSubtotal === 0 ? subtotal : discountSubtotal;
+    res.json({
+      subTotal: finalPrice,
+      minOrder: finalPrice < 500 ? minOrder + 50 : minOrder,
+    });
     return {
       subtotal: finalPrice,
-      minOrder: finalPrice < 500 ? minOrder + 50 : minOrder,
+      Delivery: finalPrice < 500 ? minOrder + 50 : minOrder,
     };
   } catch (error) {
+    console.log(error.message)
     res.status(500).json({ error: error.message });
   }
 };
