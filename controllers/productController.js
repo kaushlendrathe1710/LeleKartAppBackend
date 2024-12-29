@@ -420,7 +420,7 @@ const isPresentInCart = async (req, res) => {
 const getCart = async (req, res) => {
   try {
     const { email } = req.query;
-    console.log(email);
+
     const userCart = await db.query.carts.findFirst({
       where: eq(carts.userEmail, email),
       with: {
@@ -450,11 +450,9 @@ const getCart = async (req, res) => {
 const updateQuantityInCart = async (req, res) => {
   try {
     const { userEmail, productId, variantId, quantity, cartId } = req.body;
-    console.log("Request Body:", req.body); // Log the incoming request
-
     // If a variantId is provided
     if (variantId !== null && variantId !== undefined) {
-      console.log("Checking for variantId:", variantId);
+
 
       const existingCartProduct = await db.query.cartProducts.findFirst({
         where: and(
@@ -465,7 +463,7 @@ const updateQuantityInCart = async (req, res) => {
       });
 
       if (existingCartProduct) {
-        console.log("Existing Cart Product Found:", existingCartProduct);
+
 
         if (quantity > 0) {
           const updatedProduct = await db
@@ -475,14 +473,12 @@ const updateQuantityInCart = async (req, res) => {
             })
             .where(eq(cartProducts.id, existingCartProduct.id));
 
-          console.log("Updated Product:", updatedProduct);
+
           res.json(updatedProduct); // Return the updated product
         } else {
           const removedProduct = await db
             .delete(cartProducts)
             .where(eq(cartProducts.id, existingCartProduct.id));
-
-          console.log("Removed Product:", removedProduct);
           res.json(removedProduct); // Return the removed product
         }
       } else {
@@ -493,7 +489,6 @@ const updateQuantityInCart = async (req, res) => {
       }
     } else {
       // If no variantId is provided (i.e., it's null or undefined), find the product without a variantId
-      console.log("Checking for variantId null:", variantId);
 
       const existingCartProduct = await db.query.cartProducts.findFirst({
         where: and(
@@ -504,10 +499,7 @@ const updateQuantityInCart = async (req, res) => {
       });
 
       if (existingCartProduct) {
-        console.log(
-          "Existing Cart Product Found (no variant):",
-          existingCartProduct
-        );
+
 
         if (quantity > 0) {
           const updatedProduct = await db
@@ -517,14 +509,12 @@ const updateQuantityInCart = async (req, res) => {
             })
             .where(eq(cartProducts.id, existingCartProduct.id));
 
-          console.log("Updated Product (no variant):", updatedProduct);
           res.json(updatedProduct); // Return the updated product
         } else {
           const removedProduct = await db
             .delete(cartProducts)
             .where(eq(cartProducts.id, existingCartProduct.id));
 
-          console.log("Removed Product (no variant):", removedProduct);
           res.json(removedProduct); // Return the removed product
         }
       } else {
@@ -712,7 +702,6 @@ const subTotalInCart = async (req, res) => {
     if (!userCart) {
       return { subtotal: 0, minOrder: 0 };
     }
-    console.log(userCart.id, "userCart");
 
     const cartProductsDetails = await db.query.cartProducts.findMany({
       where: eq(cartProducts.cartId, userCart.id),
