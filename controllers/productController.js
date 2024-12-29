@@ -656,12 +656,6 @@ const removeFromCart = async (req, res) => {
 
 const subTotalInCart = async (req, res) => {
   const { pId, email, coupon,vId } = req.query;
-  // pId = productId
-  // vId= varientId
-  {
-    pId;
-  }
-  console.log(pId, email, "email");
   try {
     // console.log(coupon);
     if (pId) {
