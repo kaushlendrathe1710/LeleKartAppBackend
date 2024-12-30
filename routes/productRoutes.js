@@ -32,13 +32,14 @@ router.get(
   "/getProductsByCategoryOrSubCategory",
   getProductsByCategoryOrSubCategory
 );
-router.post("/initializeCart", initializeCart);
-router.get("/getCart", getCart);
-router.post("/addToCart", addToCart);
-router.post("/removeFromCart", removeFromCart);
-router.post("/updateQuantityInCart", updateQuantityInCart);
-router.get("/subTotalInCart", subTotalInCart);
 
+//protected routes
+router.post("/initializeCart", authMiddleware, initializeCart); // not in used right now
+router.get("/getCart", authMiddleware, getCart); //in used
+router.post("/addToCart", authMiddleware, addToCart); // in used
+router.post("/removeFromCart", authMiddleware, removeFromCart); // not in used right now
+router.post("/updateQuantityInCart", authMiddleware, updateQuantityInCart); // inused to update quantity and remove from cart
+router.get("/subTotalInCart", authMiddleware, subTotalInCart);
 router.post("/checkPinCode", async (req, res) => {
   try {
     const body = req.body;
