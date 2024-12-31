@@ -102,7 +102,7 @@ exports.GetAllYourOrders = async (req, res) => {
 };
 
 exports.GetAddresses = async (req, res) => {
-  const { email } = req.query;
+  const { id } = req.query;
   try {
     const userAddresses = await db.query.addresses?.findMany({
       where: eq(addresses.userEmail, email),
@@ -111,6 +111,29 @@ exports.GetAddresses = async (req, res) => {
       return res.status(200).json({ addresses: [] });
     }
     return res.status(200).json({ addresses: userAddresses });
+  } catch (error) {
+    console.error("Error querying user:", error);
+    res.status(500).send({ error: "Internal Server Error" });
+  }
+};
+exports.GetAddressesById = async (req, res) => {
+  const { id } = req.query;
+  try {
+    if (!id) {
+      return;
+    }
+
+    const userAddress = await ctx.db.query.addresses.findFirst({
+      where: eq(addresses.id, id),
+    });
+
+    if (!userAddress) {
+      return "";
+    }
+    console.log(userAddress);
+    return res.status(200).json({ address: userAddress });
+
+    // return userAddress;
   } catch (error) {
     console.error("Error querying user:", error);
     res.status(500).send({ error: "Internal Server Error" });

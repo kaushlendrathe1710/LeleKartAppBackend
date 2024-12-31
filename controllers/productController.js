@@ -8,7 +8,7 @@ const {
   vendors,
 } = require("../config/db/schema");
 
-const { eq, sql, and, ne, isNull, } = require("drizzle-orm");
+const { eq, sql, and, ne, isNull } = require("drizzle-orm");
 const getBanners = async (req, res) => {
   try {
     const banners = await db.query.banners.findMany();
@@ -452,8 +452,6 @@ const updateQuantityInCart = async (req, res) => {
     const { userEmail, productId, variantId, quantity, cartId } = req.body;
     // If a variantId is provided
     if (variantId !== null && variantId !== undefined) {
-
-
       const existingCartProduct = await db.query.cartProducts.findFirst({
         where: and(
           eq(cartProducts.cartId, cartId),
@@ -463,8 +461,6 @@ const updateQuantityInCart = async (req, res) => {
       });
 
       if (existingCartProduct) {
-
-
         if (quantity > 0) {
           const updatedProduct = await db
             .update(cartProducts)
@@ -472,7 +468,6 @@ const updateQuantityInCart = async (req, res) => {
               quantity: quantity,
             })
             .where(eq(cartProducts.id, existingCartProduct.id));
-
 
           res.json(updatedProduct); // Return the updated product
         } else {
@@ -499,8 +494,6 @@ const updateQuantityInCart = async (req, res) => {
       });
 
       if (existingCartProduct) {
-
-
         if (quantity > 0) {
           const updatedProduct = await db
             .update(cartProducts)
@@ -643,9 +636,84 @@ const removeFromCart = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+const getProductFromCart = async (req, res) => {
+  const { cart } = req.query;
+  try {
+    const modifiedItems = await Promise.all(
+      cart.map(async (item) => {
+        const entireItem = await ctx.db.query.products.findFirst({
+          where: { id: item.productId },
+          with: {
+            vendors: true,
+          },
+        });
+
+        if (!entireItem) {
+          return undefined;
+        }
+
+        const vendor = entireItem.vendors;
+
+        if (item.variantId) {
+          const variant = await db.query.variants.findFirst({
+            where: { id: item.variantId },
+          });
+
+          if (!variant) {
+            return undefined;
+          }
+
+          return {
+            product: entireItem.name,
+            price: variant.price.toString(),
+            product_code: variant.sku,
+            amount: item.quantity.toString(),
+            discount: "0",
+            vendor: vendor,
+            pId: item.productId,
+            quantity: item.quantity,
+            vId: item.variantId,
+          };
+        }
+
+        return {
+          product: entireItem.name,
+          price: entireItem.price.toString(),
+          product_code: entireItem.sku,
+          amount: item.quantity.toString(),
+          discount: "0",
+          vendor: vendor,
+          pId: item.productId,
+          quantity: item.quantity,
+          vId: item.variantId,
+        };
+      })
+    );
+
+    const validModifiedItems = modifiedItems
+      .filter((item) => item !== undefined)
+      .map((item) => ({
+        product: item.product,
+        price: item.price,
+        product_code: item.product_code,
+        amount: item.amount,
+        discount: item.discount,
+        vendor: item.vendor,
+        pId: item.pId,
+        quantity: item.quantity,
+        vId: item.vId,
+      }));
+
+      console.log(validModifiedItems,'validModifiedItems')
+
+    return validModifiedItems;
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
 
 const subTotalInCart = async (req, res) => {
-  const { pId, email, coupon,vId } = req.query;
+  const { pId, email, coupon, vId } = req.query;
   try {
     // console.log(coupon);
     if (pId) {
@@ -750,7 +818,7 @@ const subTotalInCart = async (req, res) => {
       Delivery: finalPrice < 500 ? minOrder + 50 : minOrder,
     };
   } catch (error) {
-    console.log(error.message)
+    console.log(error.message);
     res.status(500).json({ error: error.message });
   }
 };
@@ -770,4 +838,5 @@ module.exports = {
   updateQuantityInCart,
   subTotalInCart,
   getCart,
+  getProductFromCart,
 };

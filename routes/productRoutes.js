@@ -16,6 +16,7 @@ const {
   subTotalInCart,
   getCart,
   updateQuantityInCart,
+  getProductFromCart,
 } = require("../controllers/productController");
 const router = express.Router();
 
@@ -36,6 +37,7 @@ router.get(
 //protected routes
 router.post("/initializeCart", authMiddleware, initializeCart); // not in used right now
 router.get("/getCart", authMiddleware, getCart); //in used
+router.git("/getProductFromCart", authMiddleware, getProductFromCart);
 router.post("/addToCart", authMiddleware, addToCart); // in used
 router.post("/removeFromCart", authMiddleware, removeFromCart); // not in used right now
 router.post("/updateQuantityInCart", authMiddleware, updateQuantityInCart); // inused to update quantity and remove from cart
