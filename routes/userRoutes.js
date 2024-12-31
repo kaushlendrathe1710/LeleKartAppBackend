@@ -11,6 +11,7 @@ const {
   GetAllYourOrders,
   UpdateAddress,
   AddAddress,
+  CreateOrder,
 } = require("../controllers/userController");
 const router = express.Router();
 
@@ -22,5 +23,9 @@ router.post("/updateUserAddress", authMiddleware, UpdateAddress);
 router.post("/addAddress", authMiddleware, AddAddress);
 router.post("/deleteAddress", authMiddleware, DeleteAddress);
 router.get("/getAllYourOrders", authMiddleware, GetAllYourOrders);
+
+
+router.post("/createOrder", authMiddleware, CreateOrder);
+
 
 module.exports = router;

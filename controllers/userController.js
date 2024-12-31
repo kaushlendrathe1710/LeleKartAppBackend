@@ -2,6 +2,7 @@ const { db } = require("../config/db/db");
 const { users, addresses, orders } = require("../config/db/schema");
 const { eq } = require("drizzle-orm");
 const { validationResult } = require("express-validator");
+const fetchShiprocketToken = require("../utils/fetchShiprocketToken");
 
 exports.FindByEmail = async (req, res) => {
   const { email } = req.body;
@@ -69,8 +70,6 @@ exports.UpdateUserPassword = async (req, res) => {
     res.status(500).send({ error: "Internal Server Error" });
   }
 }; // not done yet
-
-
 
 exports.GetAllYourOrders = async (req, res) => {
   const { email } = req.query; // Use query parameters for GET requests
@@ -164,7 +163,7 @@ exports.AddAddress = async (req, res) => {
 
 exports.DeleteAddress = async (req, res) => {
   const { id, email } = req.body;
-  console.log(email,id, "email");
+  console.log(email, id, "email");
   try {
     await db.delete(addresses).where(eq(addresses.id, id));
     const userAddresses = await db.query.addresses?.findMany({
@@ -189,7 +188,10 @@ exports.UpdateAddress = async (req, res) => {
   const { email, id, ...updatedFields } = req.body; // Use query parameters for GET requests
   console.log(email, "email");
   try {
-    await req.db.update(addresses).set(updatedFields).where(eq(addresses.id, id));
+    await req.db
+      .update(addresses)
+      .set(updatedFields)
+      .where(eq(addresses.id, id));
 
     const userAddresses = await db.query.addresses?.findMany({
       where: eq(addresses.userEmail, email),
@@ -197,10 +199,278 @@ exports.UpdateAddress = async (req, res) => {
     if (!userAddresses?.length) {
       return res.status(200).json({ addresses: [] });
     }
-    return res.status(200).json({ addresses: userAddresses , message: "Address updated successfully"});
+    return res.status(200).json({
+      addresses: userAddresses,
+      message: "Address updated successfully",
+    });
   } catch (error) {
     console.error("Error querying user:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
 
+exports.ShiprocketOrder = async (req, res) => {
+  try {
+    const body = req.body; // The Shiprocket order payload
+    console.log(body);
+
+    // Fetch a fresh token using the utility function
+    const token = await fetchShiprocketToken();
+    console.log(token, "token");
+    const options = {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    };
+
+    const response = await fetch(
+      "https://apiv2.shiprocket.in/v1/external/shipments/create/forward-shipment",
+      options
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `Failed to push order: ${response.statusText} - ${errorText}`
+      );
+    }
+
+    const data = await response.json();
+
+    if (data.status_code) {
+      console.error("Validation error:", data);
+      return res.status(data.status_code).json(data);
+    } else if (data.status === 1) {
+      console.log("Success response:", data);
+      return res.json(data);
+    } else {
+      console.error("Error response:", data);
+      return res.status(400).json(data);
+    }
+  } catch (err) {
+    console.error("Error in POST function:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+exports.CreateOrder = async (req, res) => {
+  try {
+    const {
+      userEmail,
+      shippingAddressId,
+      paymentMethod,
+      totalAmount,
+      products: CartProducts,
+      razorPay,
+      createdPaymentOrderId,
+      awbCode,
+      labelUrl,
+      manifestUrl,
+      pickupBookedDate,
+      pickupScheduledDate,
+      responseOrderId,
+      shipmentId,
+    } = req.bdoy;
+
+    const user = await db.query.users.findFirst({
+      where: eq(users.email, userEmail),
+    });
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    const address = await db.query.addresses.findFirst({
+      where: eq(addresses.id, shippingAddressId),
+    });
+    if (!address) {
+      throw new Error("Shipping address not found");
+    }
+
+    const newOrder = await db
+      .insert(orders)
+      .values({
+        id: input.id,
+        userEmail,
+        shippingAddressId,
+        totalAmount,
+        paymentMethod,
+        razorPay: razorPay ?? null,
+        createdPaymentOrderId: createdPaymentOrderId ?? null,
+        orderStatus: "Pending",
+        responseOrderId,
+        shipmentId,
+        awbCode,
+        labelUrl,
+        manifestUrl,
+        pickupBookedDate,
+        pickupScheduledDate,
+      })
+      .returning();
+    console.log(newOrder);
+
+    if (!newOrder[0]) {
+      throw new Error("Order Creatiion Failed");
+    }
+
+    const newOrderId = newOrder[0].id;
+
+    await Promise.all(
+      CartProducts.map(async (product) => {
+        const { productId, variantId, quantity } = product;
+
+        const productData = await db.query.products.findFirst({
+          where: eq(products.id, productId),
+        });
+        if (!productData) {
+          throw new Error(`Product with id ${productId} not found`);
+        }
+        let price = productData.price;
+        let updatedStock = productData.stock - quantity;
+
+        if (variantId) {
+          const variantData = await db.query.variants.findFirst({
+            where: eq(variants.id, variantId),
+          });
+          if (!variantData) {
+            throw new Error(`Variant with id ${variantId} not found`);
+          }
+          price = variantData.price;
+          updatedStock = variantData.stock - quantity;
+        }
+
+        await db.insert(orderItems).values({
+          orderId: newOrderId,
+          productId,
+          variantId: variantId ?? null,
+          quantity,
+          price,
+          vendorEmail: productData.vendorEmail,
+          userEmail,
+          userName: user.name,
+        });
+
+        const vendor = await db.query.vendors.findFirst({
+          where: eq(vendors.vendorEmail, productData.vendorEmail),
+        });
+        if (!vendor) {
+          throw new Error(`vendor not found`);
+        }
+
+        const vendorEarnings = vendor.earnings;
+
+        await db
+          .update(vendors)
+          .set({ earnings: quantity * price + vendorEarnings })
+          .where(eq(vendors.vendorEmail, productData.vendorEmail));
+        const vendorPaymentDetail = await db.query.vendorPayments.findFirst({
+          where: eq(vendorPayments.vendorEmail, productData.vendorEmail),
+        });
+        const dashboardDetails =
+          await db.query.adminDashboardValues.findFirst();
+        if (!dashboardDetails) {
+          throw new Error("Dashboard Detials Not Found");
+        }
+        const { vendorAdminCostPercentage, vendorCourierCostPercentage } =
+          dashboardDetails;
+        if (!vendorPaymentDetail) {
+          await db
+            .insert(vendorPayments)
+            .values({
+              totalAdminCost:
+                price * quantity * vendorAdminCostPercentage * 0.01,
+              totalCourierCost:
+                price * quantity * vendorCourierCostPercentage * 0.01,
+              totalFinalPrice:
+                price * quantity -
+                price * quantity * vendorAdminCostPercentage * 0.01 -
+                price * quantity * vendorCourierCostPercentage * 0.01,
+              totalProductCost: price * quantity,
+              vendorEmail: vendor.vendorEmail,
+              vendorName: vendor.name ?? "",
+              vendorPhone: vendor.phone,
+            })
+            .returning();
+        } else {
+          await db
+            .update(vendorPayments)
+            .set({
+              totalAdminCost:
+                vendorPaymentDetail.totalAdminCost +
+                price * quantity * vendorAdminCostPercentage * 0.01,
+              totalCourierCost:
+                vendorPaymentDetail.totalCourierCost +
+                price * quantity * vendorCourierCostPercentage * 0.01,
+              totalProductCost:
+                vendorPaymentDetail.totalProductCost + price * quantity,
+              totalFinalPrice:
+                vendorPaymentDetail.totalFinalPrice +
+                price * quantity -
+                price * quantity * vendorAdminCostPercentage * 0.01 -
+                price * quantity * vendorCourierCostPercentage * 0.01,
+            })
+            .where(eq(vendorPayments.vendorEmail, productData.vendorEmail));
+        }
+
+        if (variantId) {
+          await db
+            .update(variants)
+            .set({ stock: updatedStock })
+            .where(eq(variants.id, variantId));
+        } else {
+          await db
+            .update(products)
+            .set({ stock: updatedStock })
+            .where(eq(products.id, productId));
+        }
+      })
+    );
+
+    const userCart = await db.query.carts.findFirst({
+      where: eq(carts.userEmail, user.email),
+    });
+    if (userCart) {
+      await db.delete(cartProducts).where(eq(cartProducts.cartId, userCart.id));
+    }
+
+    const userPaymentDetails = await db.query.userPayments.findFirst({
+      where: eq(userPayments.userEmail, input.userEmail),
+    });
+
+    const userDetails = await db.query.users.findFirst({
+      where: eq(users.email, input.userEmail),
+    });
+
+    if (!userDetails) {
+      throw new Error("User Details Not Found");
+    }
+
+    if (!userPaymentDetails) {
+      await db.insert(userPayments).values({
+        userEmail: input.userEmail,
+        userName: userDetails.name,
+        userPhone: userDetails.phone,
+        TotalPaid: input.totalAmount,
+      });
+    } else {
+      const userPreviousPaidValue = userPaymentDetails.TotalPaid;
+      await db
+        .update(userPayments)
+        .set({ TotalPaid: userPreviousPaidValue + input.totalAmount })
+        .where(eq(userPayments.userEmail, input.userEmail));
+    }
+
+    return newOrder;
+  } catch (err) {
+    console.log(err.message);
+  }
+};
+
+exports.CancelOrder = async (req, res) => {
+  try {
+  } catch (err) {
+    console.log(err.message);
+  }
+};
