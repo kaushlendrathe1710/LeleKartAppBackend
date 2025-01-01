@@ -102,7 +102,9 @@ exports.GetAllYourOrders = async (req, res) => {
 };
 
 exports.GetAddresses = async (req, res) => {
-  const { id } = req.query;
+  // console.log('hit this api')
+  const { email } = req.query;
+  // console.log(email)
   try {
     const userAddresses = await db.query.addresses?.findMany({
       where: eq(addresses.userEmail, email),
@@ -118,12 +120,13 @@ exports.GetAddresses = async (req, res) => {
 };
 exports.GetAddressesById = async (req, res) => {
   const { id } = req.query;
+  console.log(id,'id')
   try {
     if (!id) {
       return;
     }
 
-    const userAddress = await ctx.db.query.addresses.findFirst({
+    const userAddress = await db.query.addresses.findFirst({
       where: eq(addresses.id, id),
     });
 

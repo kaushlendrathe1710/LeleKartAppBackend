@@ -1,5 +1,3 @@
-const fetch = require("node-fetch");
-require("dotenv").config();
 
 // Environment variables
 const SHIPROCKET_EMAIL = process.env.SHIPROCKET_EMAIL;

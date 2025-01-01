@@ -420,7 +420,6 @@ const isPresentInCart = async (req, res) => {
 const getCart = async (req, res) => {
   try {
     const { email } = req.query;
-
     const userCart = await db.query.carts.findFirst({
       where: eq(carts.userEmail, email),
       with: {
@@ -438,7 +437,6 @@ const getCart = async (req, res) => {
       });
       return newCart;
     }
-
     res.json(userCart);
     return userCart;
   } catch (error) {
@@ -636,79 +634,101 @@ const removeFromCart = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
-const getProductFromCart = async (req, res) => {
-  const { cart } = req.query;
+
+const getProductFromCartWithVendor = async (req, res) => {
   try {
-    const modifiedItems = await Promise.all(
-      cart.map(async (item) => {
-        const entireItem = await ctx.db.query.products.findFirst({
-          where: { id: item.productId },
-          with: {
-            vendors: true,
-          },
-        });
+    const { email } = req.query;
 
-        if (!entireItem) {
-          return undefined;
-        }
+    // Fetch user's cart with associated cart products
+    const userCart = await db.query.carts.findFirst({
+      where: eq(carts.userEmail, email),
+      with: {
+        cartProducts: true,
+      },
+    });
 
-        const vendor = entireItem.vendors;
+    console.log("userCart", userCart);
+    if (!userCart) {
+      return res.status(404).json({ error: "Cart not found for the user" });
+    }
 
-        if (item.variantId) {
-          const variant = await db.query.variants.findFirst({
-            where: { id: item.variantId },
+    // Map over cartProducts and fetch associated product and vendor details
+    const cartProductsWithDetails = await Promise.all(
+      userCart.cartProducts.map(async (cartProduct) => {
+        console.log(cartProduct.id, "cartproduct id ");
+        try {
+          const product = await db.query.products.findFirst({
+            where: eq(products.id, cartProduct.id),
+            with: {
+              vendors: true,
+            },
           });
-
-          if (!variant) {
-            return undefined;
+          console.log(product, "product");
+          if (!product) {
+            console.log(
+              `Product not found for productId: ${cartProduct.productId}`
+            );
+            return null;
           }
 
+          const vendor = product.vendors || {};
           return {
-            product: entireItem.name,
-            price: variant.price.toString(),
-            product_code: variant.sku,
-            amount: item.quantity.toString(),
-            discount: "0",
-            vendor: vendor,
-            pId: item.productId,
-            quantity: item.quantity,
-            vId: item.variantId,
+            product: product.name,
+            price: product.price,
+            product_code: product.sku,
+            amount: cartProduct.quantity,
+            discount: product.discount || "0", // Adjust if `discount` exists in your schema
+            vendor: {
+              id: vendor.id,
+              companyName: vendor.companyName,
+              businessName: vendor.businessName,
+              displayName: vendor.displayName,
+              name: vendor.name,
+              house: vendor.house,
+              street: vendor.street,
+              landmark: vendor.landmark,
+              city: vendor.city,
+              state: vendor.state,
+              pincode: vendor.pincode,
+              country: vendor.country,
+              pan: vendor.pan,
+              aadhar: vendor.aadhar,
+              gst: vendor.gst,
+              accountNumber: vendor.accountNumber,
+              accountHolderName: vendor.accountHolderName,
+              bankName: vendor.bankName,
+              branchName: vendor.branchName,
+              ifscCode: vendor.ifscCode,
+              vendorEmail: vendor.vendorEmail,
+              isApproved: vendor.isApproved,
+              phone: vendor.phone,
+              warehouseId: vendor.warehouseId,
+              earnings: vendor.earnings,
+              minOrderPrice: vendor.minOrderPrice,
+            },
+            pId: cartProduct.productId,
+            quantity: cartProduct.quantity,
+            vId: cartProduct.variantId,
           };
+        } catch (error) {
+          console.error(
+            `Error fetching product for cartProduct: ${cartProduct.id}`,
+            error.message
+          );
+          return null;
         }
-
-        return {
-          product: entireItem.name,
-          price: entireItem.price.toString(),
-          product_code: entireItem.sku,
-          amount: item.quantity.toString(),
-          discount: "0",
-          vendor: vendor,
-          pId: item.productId,
-          quantity: item.quantity,
-          vId: item.variantId,
-        };
       })
     );
 
-    const validModifiedItems = modifiedItems
-      .filter((item) => item !== undefined)
-      .map((item) => ({
-        product: item.product,
-        price: item.price,
-        product_code: item.product_code,
-        amount: item.amount,
-        discount: item.discount,
-        vendor: item.vendor,
-        pId: item.pId,
-        quantity: item.quantity,
-        vId: item.vId,
-      }));
-
-      console.log(validModifiedItems,'validModifiedItems')
-
-    return validModifiedItems;
+    // Filter out null values in case some products are not found
+    const validProducts = cartProductsWithDetails.filter(
+      (item) => item !== null
+    );
+    console.log(validProducts);
+    return res.status(200).json(validProducts);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error("Error:", error.message);
+    return res.status(500).json({ error: "Internal server error" });
   }
 };
 
@@ -838,5 +858,5 @@ module.exports = {
   updateQuantityInCart,
   subTotalInCart,
   getCart,
-  getProductFromCart,
+  getProductFromCartWithVendor,
 };

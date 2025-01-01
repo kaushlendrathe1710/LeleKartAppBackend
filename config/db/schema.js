@@ -724,4 +724,5 @@ module.exports = {
   categories,
   subCategories,
   vendors,
+  vendorsRelations,
 };
