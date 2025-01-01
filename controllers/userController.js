@@ -1,5 +1,16 @@
 const { db } = require("../config/db/db");
-const { users, addresses, orders } = require("../config/db/schema");
+const {
+  users,
+  addresses,
+  orders,
+  products,
+  orderItems,
+  vendors,
+  vendorPayments,
+  carts,
+  cartProducts,
+  userPayments
+} = require("../config/db/schema");
 const { eq } = require("drizzle-orm");
 const { validationResult } = require("express-validator");
 const fetchShiprocketToken = require("../utils/fetchShiprocketToken");
@@ -120,7 +131,7 @@ exports.GetAddresses = async (req, res) => {
 };
 exports.GetAddressesById = async (req, res) => {
   const { id } = req.query;
-  console.log(id,'id')
+  console.log(id, "id");
   try {
     if (!id) {
       return;
@@ -237,8 +248,8 @@ exports.UpdateAddress = async (req, res) => {
 
 exports.ShiprocketOrder = async (req, res) => {
   try {
-    const body = req.body; // The Shiprocket order payload
-    console.log(body);
+    const body = req.body; 
+    console.log(body, "body");
 
     // Fetch a fresh token using the utility function
     const token = await fetchShiprocketToken();
@@ -283,13 +294,15 @@ exports.ShiprocketOrder = async (req, res) => {
 };
 
 exports.CreateOrder = async (req, res) => {
+  console.log("hit this ");
   try {
     const {
+      id,
       userEmail,
       shippingAddressId,
       paymentMethod,
       totalAmount,
-      products: CartProducts,
+      checkoutProduct,
       razorPay,
       createdPaymentOrderId,
       awbCode,
@@ -299,7 +312,7 @@ exports.CreateOrder = async (req, res) => {
       pickupScheduledDate,
       responseOrderId,
       shipmentId,
-    } = req.bdoy;
+    } = req.body;
 
     const user = await db.query.users.findFirst({
       where: eq(users.email, userEmail),
@@ -318,7 +331,7 @@ exports.CreateOrder = async (req, res) => {
     const newOrder = await db
       .insert(orders)
       .values({
-        id: input.id,
+        id: id,
         userEmail,
         shippingAddressId,
         totalAmount,
@@ -344,7 +357,7 @@ exports.CreateOrder = async (req, res) => {
     const newOrderId = newOrder[0].id;
 
     await Promise.all(
-      CartProducts.map(async (product) => {
+      checkoutProduct.map(async (product) => {
         const { productId, variantId, quantity } = product;
 
         const productData = await db.query.products.findFirst({
@@ -462,11 +475,11 @@ exports.CreateOrder = async (req, res) => {
     }
 
     const userPaymentDetails = await db.query.userPayments.findFirst({
-      where: eq(userPayments.userEmail, input.userEmail),
+      where: eq(userPayments.userEmail, userEmail),
     });
 
     const userDetails = await db.query.users.findFirst({
-      where: eq(users.email, input.userEmail),
+      where: eq(users.email, userEmail),
     });
 
     if (!userDetails) {
@@ -475,19 +488,20 @@ exports.CreateOrder = async (req, res) => {
 
     if (!userPaymentDetails) {
       await db.insert(userPayments).values({
-        userEmail: input.userEmail,
+        userEmail: userEmail,
         userName: userDetails.name,
         userPhone: userDetails.phone,
-        TotalPaid: input.totalAmount,
+        TotalPaid: totalAmount,
       });
     } else {
       const userPreviousPaidValue = userPaymentDetails.TotalPaid;
       await db
         .update(userPayments)
-        .set({ TotalPaid: userPreviousPaidValue + input.totalAmount })
-        .where(eq(userPayments.userEmail, input.userEmail));
+        .set({ TotalPaid: userPreviousPaidValue + totalAmount })
+        .where(eq(userPayments.userEmail, userEmail));
     }
-
+    console.log(newOrder, "neworder");
+    res.json(newOrder);
     return newOrder;
   } catch (err) {
     console.log(err.message);
