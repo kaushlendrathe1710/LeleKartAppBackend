@@ -9,7 +9,9 @@ const {
   vendorPayments,
   carts,
   cartProducts,
-  userPayments
+  userPayments,
+  variants,
+  cancelItems,
 } = require("../config/db/schema");
 const { eq } = require("drizzle-orm");
 const { validationResult } = require("express-validator");
@@ -248,7 +250,7 @@ exports.UpdateAddress = async (req, res) => {
 
 exports.ShiprocketOrder = async (req, res) => {
   try {
-    const body = req.body; 
+    const body = req.body;
     console.log(body, "body");
 
     // Fetch a fresh token using the utility function
@@ -292,7 +294,7 @@ exports.ShiprocketOrder = async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
-exports.shipRocketgetOrderDetails=async (req, res) => {
+exports.shipRocketgetOrderDetails = async (req, res) => {
   try {
     const { orderId } = req.body;
     console.log(orderId, "orderId");
@@ -326,6 +328,39 @@ exports.shipRocketgetOrderDetails=async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
+// Backend function to handle canceling orders
+exports.shipRoocketCancelOrder = async (req, res) => {
+  try {
+    const { ids } = req.body;
+
+    if (!ids || !Array.isArray(ids)) {
+      return res.status(400).json({ error: "Invalid request: 'ids' is required and must be an array." });
+    }
+
+    // Fetch the Shiprocket token
+    const token = await fetchShiprocketToken();
+
+    const response = await fetch("https://apiv2.shiprocket.in/v1/external/orders/cancel", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ ids }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to cancel orders: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return res.status(200).json(data);
+  } catch (error) {
+    console.error("Error canceling order:", error.message);
+    return res.status(500).json({ error: "Failed to cancel order." });
+  }
+};
+
 
 exports.CreateOrder = async (req, res) => {
   console.log("CreateOrder API called with data:", req.body);
@@ -572,10 +607,98 @@ exports.CreateOrder = async (req, res) => {
   }
 };
 
-
 exports.CancelOrder = async (req, res) => {
+  const { orderId } = req.body;
+  console.log(orderId, "orderId");
   try {
+    // Step 1: Update the order status to 'Cancelled'
+    await db
+      .update(orders)
+      .set({ orderStatus: "Cancelled" })
+      .where(eq(orders.id, orderId));
+
+    // Step 2: Delete associated order items
+    const deletedItems = await db
+      .delete(orderItems)
+      .where(eq(orderItems.orderId, orderId))
+      .returning();
+
+    if (deletedItems.length === 0) {
+      return res.status(404).json({ error: "No items found for this order." });
+    }
+
+    // Step 3: Insert deleted items into cancelItems table
+    await Promise.all(
+      deletedItems.map(async (item) => {
+        // Insert deleted items into the cancelItems table
+        await db.insert(cancelItems).values({
+          orderId: item.orderId,
+          price: item.price,
+          productId: item.productId,
+          quantity: item.quantity,
+          userEmail: item.userEmail,
+          userName: item.userName,
+          vendorEmail: item.vendorEmail,
+          createdAt: item.createdAt,
+          variantId: item.variantId,
+        });
+
+        // Step 4: Update vendor earnings (ensure the vendor exists)
+        const vendor = await db.query.vendors.findFirst({
+          where: eq(vendors.vendorEmail, item.vendorEmail),
+        });
+
+        if (!vendor) {
+          throw new Error(`Vendor not found: ${item.vendorEmail}`);
+        }
+
+        const vendorEarnings = vendor.earnings;
+        await db
+          .update(vendors)
+          .set({ earnings: vendorEarnings - item.price * item.quantity })
+          .where(eq(vendors.vendorEmail, item.vendorEmail));
+
+        // Step 5: Update stock levels for variants or products
+        if (item.variantId) {
+          const variant = await db.query.variants.findFirst({
+            where: eq(variants.id, item.variantId),
+          });
+
+          if (!variant) {
+            return; // If the variant doesn't exist, just return
+          }
+
+          const newVariantStock = variant.stock + item.quantity;
+          await db
+            .update(variants)
+            .set({ stock: newVariantStock })
+            .where(eq(variants.id, item.variantId));
+        } else {
+          const product = await db.query.products.findFirst({
+            where: eq(products.id, item.productId),
+          });
+
+          if (!product) {
+            return; // If the product doesn't exist, just return
+          }
+
+          const newProductStock = product.stock + item.quantity;
+          await db
+            .update(products)
+            .set({ stock: newProductStock })
+            .where(eq(products.id, item.productId));
+        }
+      })
+    );
+
+    // Success response
+    return res
+      .status(200)
+      .json({ success: true, message: "Order canceled successfully." });
   } catch (err) {
-    console.log(err.message);
+    console.error("Error canceling order:", err.message);
+    return res
+      .status(500)
+      .json({ error: "Failed to cancel order. Please try again." });
   }
 };
