@@ -18,6 +18,7 @@ const getBanners = async (req, res) => {
     res.status(500).send({ error: "Internal Server Error" });
   }
 };
+
 const getCategories = async (req, res) => {
   try {
     const categories = await db.query.categories.findMany({
@@ -31,6 +32,7 @@ const getCategories = async (req, res) => {
     res.status(500).send({ error: "Internal Server Error" });
   }
 };
+
 const getProductsWithCategory = async (req, res) => {
   try {
     const order = await db.query.adminDashboardValues.findFirst();
@@ -159,6 +161,7 @@ const getProductsWithCategory = async (req, res) => {
     res.status(500).send({ error: "Internal Server Error" });
   }
 };
+
 const getBestSellers = async (req, res) => {
   const queryProducts = await db.query.products.findMany({
     where: eq(products.isApproved, "accepted"),
@@ -176,6 +179,7 @@ const getBestSellers = async (req, res) => {
   });
   res.json({ products: queryProducts });
 };
+
 const getProduct = async (req, res) => {
   const { productId } = req.query;
   console.log(productId);
@@ -201,6 +205,7 @@ const getProduct = async (req, res) => {
     res.status(500).send({ error: "Internal Server Error" });
   }
 };
+
 const getProductsByCategory = async (req, res) => {
   /// for best product recommendation
   const { id, productId } = req.query;
@@ -227,6 +232,7 @@ const getProductsByCategory = async (req, res) => {
     res.status(500).send({ error: "Internal Server Error" });
   }
 };
+
 const getProductsByCategoryAll = async (req, res) => {
   const { id, page = 1, limit = 10 } = req.query;
   try {
@@ -357,6 +363,7 @@ const getProductsByCategoryOrSubCategory = async (req, res) => {
     res.status(500).send({ error: "Internal Server Error" });
   }
 };
+
 const initializeCart = async (req, res) => {
   console.log(req.body);
   try {
@@ -386,6 +393,7 @@ const initializeCart = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
 const isPresentInCart = async (req, res) => {
   const { variantId, cartId } = req.query;
   try {
@@ -638,7 +646,6 @@ const removeFromCart = async (req, res) => {
 const getProductFromCartWithVendor = async (req, res) => {
   try {
     const { email } = req.query;
-
     // Fetch user's cart with associated cart products
     const userCart = await db.query.carts.findFirst({
       where: eq(carts.userEmail, email),
@@ -647,7 +654,7 @@ const getProductFromCartWithVendor = async (req, res) => {
       },
     });
 
-    console.log("userCart", userCart);
+    console.log("userCart 👌👌👌👌👌👌", userCart );
     if (!userCart) {
       return res.status(404).json({ error: "Cart not found for the user" });
     }
@@ -658,12 +665,12 @@ const getProductFromCartWithVendor = async (req, res) => {
         console.log(cartProduct.id, "cartproduct id ");
         try {
           const product = await db.query.products.findFirst({
-            where: eq(products.id, cartProduct.id),
+            where: eq(products.id, cartProduct.productId),
             with: {
               vendors: true,
             },
           });
-          console.log(product, "product");
+          // console.log(product, "product");
           if (!product) {
             console.log(
               `Product not found for productId: ${cartProduct.productId}`
@@ -724,7 +731,7 @@ const getProductFromCartWithVendor = async (req, res) => {
     const validProducts = cartProductsWithDetails.filter(
       (item) => item !== null
     );
-    console.log(validProducts);
+    // console.log(validProducts);
     return res.status(200).json(validProducts);
   } catch (error) {
     console.error("Error:", error.message);
