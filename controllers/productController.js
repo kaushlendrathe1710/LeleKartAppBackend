@@ -654,7 +654,6 @@ const getProductFromCartWithVendor = async (req, res) => {
       },
     });
 
-    console.log("userCart 👌👌👌👌👌👌", userCart );
     if (!userCart) {
       return res.status(404).json({ error: "Cart not found for the user" });
     }

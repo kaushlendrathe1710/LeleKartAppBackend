@@ -14,6 +14,7 @@ const {
   CreateOrder,
   ShiprocketOrder,
   GetAddressesById,
+  shipRocketgetOrderDetails,
 } = require("../controllers/userController");
 const router = express.Router();
 
@@ -30,6 +31,11 @@ router.get("/getAllYourOrders", authMiddleware, GetAllYourOrders);
 
 router.post("/createOrder", authMiddleware, CreateOrder);
 router.post("/ShiprocketOrder", authMiddleware, ShiprocketOrder);
+router.post(
+  "/shipRocketgetOrderDetails",
+  authMiddleware,
+  shipRocketgetOrderDetails
+);
 
 
 module.exports = router;
