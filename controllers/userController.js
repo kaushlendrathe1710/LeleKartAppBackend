@@ -282,7 +282,7 @@ exports.ShiprocketOrder = async (req, res) => {
       return res.status(data.status_code).json(data);
     } else if (data.status === 1) {
       console.log("Success response:", data);
-      return res.json(data);
+      return res.status(200).json(data);
     } else {
       console.error("Error response:", data);
       return res.status(400).json(data);
@@ -293,8 +293,225 @@ exports.ShiprocketOrder = async (req, res) => {
   }
 };
 
+// exports.CreateOrder = async (req, res) => {
+//   console.log("hit this ");
+//   try {
+//     const {
+//       id,
+//       userEmail,
+//       shippingAddressId,
+//       paymentMethod,
+//       totalAmount,
+//       checkoutProduct,
+//       razorPay,
+//       createdPaymentOrderId,
+//       awbCode,
+//       labelUrl,
+//       manifestUrl,
+//       pickupBookedDate,
+//       pickupScheduledDate,
+//       responseOrderId,
+//       shipmentId,
+//     } = req.body;
+
+//     const user = await db.query.users.findFirst({
+//       where: eq(users.email, userEmail),
+//     });
+//     if (!user) {
+//       throw new Error("User not found");
+//     }
+
+//     const address = await db.query.addresses.findFirst({
+//       where: eq(addresses.id, shippingAddressId),
+//     });
+//     if (!address) {
+//       throw new Error("Shipping address not found");
+//     }
+
+//     const newOrder = await db
+//       .insert(orders)
+//       .values({
+//         id: id,
+//         userEmail,
+//         shippingAddressId,
+//         totalAmount,
+//         paymentMethod,
+//         razorPay: razorPay ?? null,
+//         createdPaymentOrderId: createdPaymentOrderId ?? null,
+//         orderStatus: "Pending",
+//         responseOrderId,
+//         shipmentId,
+//         awbCode,
+//         labelUrl,
+//         manifestUrl,
+//         pickupBookedDate,
+//         pickupScheduledDate,
+//       })
+//       .returning();
+//     console.log(newOrder);
+
+//     if (!newOrder[0]) {
+//       throw new Error("Order Creatiion Failed");
+//     }
+
+//     const newOrderId = newOrder[0].id;
+
+//     await Promise.all(
+//       checkoutProduct.map(async (product) => {
+//         const { productId, variantId, quantity } = product;
+
+//         const productData = await db.query.products.findFirst({
+//           where: eq(products.id, productId),
+//         });
+//         if (!productData) {
+//           throw new Error(`Product with id ${productId} not found`);
+//         }
+//         let price = productData.price;
+//         let updatedStock = productData.stock - quantity;
+
+//         if (variantId) {
+//           const variantData = await db.query.variants.findFirst({
+//             where: eq(variants.id, variantId),
+//           });
+//           if (!variantData) {
+//             throw new Error(`Variant with id ${variantId} not found`);
+//           }
+//           price = variantData.price;
+//           updatedStock = variantData.stock - quantity;
+//         }
+
+//         await db.insert(orderItems).values({
+//           orderId: newOrderId,
+//           productId,
+//           variantId: variantId ?? null,
+//           quantity,
+//           price,
+//           vendorEmail: productData.vendorEmail,
+//           userEmail,
+//           userName: user.name,
+//         });
+
+//         const vendor = await db.query.vendors.findFirst({
+//           where: eq(vendors.vendorEmail, productData.vendorEmail),
+//         });
+//         if (!vendor) {
+//           throw new Error(`vendor not found`);
+//         }
+
+//         const vendorEarnings = vendor.earnings;
+
+//         await db
+//           .update(vendors)
+//           .set({ earnings: quantity * price + vendorEarnings })
+//           .where(eq(vendors.vendorEmail, productData.vendorEmail));
+//         const vendorPaymentDetail = await db.query.vendorPayments.findFirst({
+//           where: eq(vendorPayments.vendorEmail, productData.vendorEmail),
+//         });
+//         const dashboardDetails =
+//           await db.query.adminDashboardValues.findFirst();
+//         if (!dashboardDetails) {
+//           throw new Error("Dashboard Detials Not Found");
+//         }
+//         const { vendorAdminCostPercentage, vendorCourierCostPercentage } =
+//           dashboardDetails;
+//         if (!vendorPaymentDetail) {
+//           await db
+//             .insert(vendorPayments)
+//             .values({
+//               totalAdminCost:
+//                 price * quantity * vendorAdminCostPercentage * 0.01,
+//               totalCourierCost:
+//                 price * quantity * vendorCourierCostPercentage * 0.01,
+//               totalFinalPrice:
+//                 price * quantity -
+//                 price * quantity * vendorAdminCostPercentage * 0.01 -
+//                 price * quantity * vendorCourierCostPercentage * 0.01,
+//               totalProductCost: price * quantity,
+//               vendorEmail: vendor.vendorEmail,
+//               vendorName: vendor.name ?? "",
+//               vendorPhone: vendor.phone,
+//             })
+//             .returning();
+//         } else {
+//           await db
+//             .update(vendorPayments)
+//             .set({
+//               totalAdminCost:
+//                 vendorPaymentDetail.totalAdminCost +
+//                 price * quantity * vendorAdminCostPercentage * 0.01,
+//               totalCourierCost:
+//                 vendorPaymentDetail.totalCourierCost +
+//                 price * quantity * vendorCourierCostPercentage * 0.01,
+//               totalProductCost:
+//                 vendorPaymentDetail.totalProductCost + price * quantity,
+//               totalFinalPrice:
+//                 vendorPaymentDetail.totalFinalPrice +
+//                 price * quantity -
+//                 price * quantity * vendorAdminCostPercentage * 0.01 -
+//                 price * quantity * vendorCourierCostPercentage * 0.01,
+//             })
+//             .where(eq(vendorPayments.vendorEmail, productData.vendorEmail));
+//         }
+
+//         if (variantId) {
+//           await db
+//             .update(variants)
+//             .set({ stock: updatedStock })
+//             .where(eq(variants.id, variantId));
+//         } else {
+//           await db
+//             .update(products)
+//             .set({ stock: updatedStock })
+//             .where(eq(products.id, productId));
+//         }
+//       })
+//     );
+
+//     const userCart = await db.query.carts.findFirst({
+//       where: eq(carts.userEmail, user.email),
+//     });
+//     if (userCart) {
+//       await db.delete(cartProducts).where(eq(cartProducts.cartId, userCart.id));
+//     }
+
+//     const userPaymentDetails = await db.query.userPayments.findFirst({
+//       where: eq(userPayments.userEmail, userEmail),
+//     });
+
+//     const userDetails = await db.query.users.findFirst({
+//       where: eq(users.email, userEmail),
+//     });
+
+//     if (!userDetails) {
+//       throw new Error("User Details Not Found");
+//     }
+
+//     if (!userPaymentDetails) {
+//       await db.insert(userPayments).values({
+//         userEmail: userEmail,
+//         userName: userDetails.name,
+//         userPhone: userDetails.phone,
+//         TotalPaid: totalAmount,
+//       });
+//     } else {
+//       const userPreviousPaidValue = userPaymentDetails.TotalPaid;
+//       await db
+//         .update(userPayments)
+//         .set({ TotalPaid: userPreviousPaidValue + totalAmount })
+//         .where(eq(userPayments.userEmail, userEmail));
+//     }
+//     console.log(newOrder, "neworder");
+//     res.json(newOrder);
+//     return newOrder;
+//   } catch (err) {
+//     console.log(err.message);
+//   }
+// };
+
+
 exports.CreateOrder = async (req, res) => {
-  console.log("hit this ");
+  console.log("CreateOrder API called with data:", req.body);
+
   try {
     const {
       id,
@@ -314,20 +531,29 @@ exports.CreateOrder = async (req, res) => {
       shipmentId,
     } = req.body;
 
+    // Validate required fields
+    if (!id || !userEmail || !shippingAddressId) {
+      console.error("Missing required fields");
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
     const user = await db.query.users.findFirst({
       where: eq(users.email, userEmail),
     });
     if (!user) {
-      throw new Error("User not found");
+      console.error("User not found");
+      return res.status(404).json({ error: "User not found" });
     }
 
     const address = await db.query.addresses.findFirst({
       where: eq(addresses.id, shippingAddressId),
     });
     if (!address) {
-      throw new Error("Shipping address not found");
+      console.error("Shipping address not found");
+      return res.status(404).json({ error: "Shipping address not found" });
     }
 
+    // Create the main order
     const newOrder = await db
       .insert(orders)
       .values({
@@ -348,14 +574,15 @@ exports.CreateOrder = async (req, res) => {
         pickupScheduledDate,
       })
       .returning();
-    console.log(newOrder);
 
     if (!newOrder[0]) {
-      throw new Error("Order Creatiion Failed");
+      console.error("Order creation failed");
+      return res.status(500).json({ error: "Order creation failed" });
     }
 
     const newOrderId = newOrder[0].id;
 
+    // Process all products in the order
     await Promise.all(
       checkoutProduct.map(async (product) => {
         const { productId, variantId, quantity } = product;
@@ -366,6 +593,7 @@ exports.CreateOrder = async (req, res) => {
         if (!productData) {
           throw new Error(`Product with id ${productId} not found`);
         }
+
         let price = productData.price;
         let updatedStock = productData.stock - quantity;
 
@@ -380,6 +608,7 @@ exports.CreateOrder = async (req, res) => {
           updatedStock = variantData.stock - quantity;
         }
 
+        // Create order items
         await db.insert(orderItems).values({
           orderId: newOrderId,
           productId,
@@ -391,6 +620,7 @@ exports.CreateOrder = async (req, res) => {
           userName: user.name,
         });
 
+        // Update vendor earnings
         const vendor = await db.query.vendors.findFirst({
           where: eq(vendors.vendorEmail, productData.vendorEmail),
         });
@@ -404,16 +634,21 @@ exports.CreateOrder = async (req, res) => {
           .update(vendors)
           .set({ earnings: quantity * price + vendorEarnings })
           .where(eq(vendors.vendorEmail, productData.vendorEmail));
+
+        // Handle vendor payments
         const vendorPaymentDetail = await db.query.vendorPayments.findFirst({
           where: eq(vendorPayments.vendorEmail, productData.vendorEmail),
         });
+
         const dashboardDetails =
           await db.query.adminDashboardValues.findFirst();
         if (!dashboardDetails) {
-          throw new Error("Dashboard Detials Not Found");
+          throw new Error("Dashboard Details Not Found");
         }
+
         const { vendorAdminCostPercentage, vendorCourierCostPercentage } =
           dashboardDetails;
+
         if (!vendorPaymentDetail) {
           await db
             .insert(vendorPayments)
@@ -453,6 +688,7 @@ exports.CreateOrder = async (req, res) => {
             .where(eq(vendorPayments.vendorEmail, productData.vendorEmail));
         }
 
+        // Update product stock
         if (variantId) {
           await db
             .update(variants)
@@ -467,6 +703,7 @@ exports.CreateOrder = async (req, res) => {
       })
     );
 
+    // Clear user's cart
     const userCart = await db.query.carts.findFirst({
       where: eq(carts.userEmail, user.email),
     });
@@ -474,6 +711,7 @@ exports.CreateOrder = async (req, res) => {
       await db.delete(cartProducts).where(eq(cartProducts.cartId, userCart.id));
     }
 
+    // Update user payment details
     const userPaymentDetails = await db.query.userPayments.findFirst({
       where: eq(userPayments.userEmail, userEmail),
     });
@@ -500,13 +738,22 @@ exports.CreateOrder = async (req, res) => {
         .set({ TotalPaid: userPreviousPaidValue + totalAmount })
         .where(eq(userPayments.userEmail, userEmail));
     }
-    console.log(newOrder, "neworder");
-    res.json(newOrder);
-    return newOrder;
+
+    console.log("Order created successfully:", newOrderId);
+    return res.status(200).json({
+      success: true,
+      data: newOrder[0],
+      message: "Order created successfully",
+    });
   } catch (err) {
-    console.log(err.message);
+    console.error("Error in CreateOrder:", err.message);
+    return res.status(500).json({
+      error: "Internal Server Error",
+      message: err.message,
+    });
   }
 };
+
 
 exports.CancelOrder = async (req, res) => {
   try {
